@@ -1,0 +1,20 @@
+devices:
+  - name: sample-cisco-router
+    hostname: 192.168.2.1
+    vendor: cisco
+    port: 22
+    username: admin
+    password: "<PASSWORD>"
+    enable_password: "<PASSWORD>"
+  - name: sample-juniper-router
+    hostname: 192.168.2.2
+    vendor: juniper
+    port: 22
+    username: admin
+    password: "<PASSWORD>"
+  - name: sample-aruba-switch
+    hostname: 192.168.2.3
+    vendor: aruba
+    port: 22
+    username: admin
+    password: "<PASSWORD>"
