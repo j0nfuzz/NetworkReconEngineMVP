@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 from app.collector import execute_device_collection, write_bundle
 from app.config import load_devices
-from app.detector import identify_device
+from app.detector import classify_role, identify_device
 from app.models import Device
 
 
@@ -125,9 +125,11 @@ def main() -> int:
                             "model": identity.model,
                             "confidence": identity.confidence,
                         }
+                        role = classify_role(identity, device.name)
+                        device.metadata["role"] = {"role": role.role, "confidence": role.confidence}
                         log_verbose(
                             f"[verbose] Detected identity for {device.hostname}: "
-                            f"vendor={identity.vendor}, platform={identity.platform}, model={identity.model}"
+                            f"vendor={identity.vendor}, platform={identity.platform}, model={identity.model}, role={role.role}"
                         )
                     finally:
                         client.close(connection)

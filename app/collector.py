@@ -20,6 +20,8 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
         "platform": "unknown",
         "model": "unknown",
         "identity_confidence": 0.0,
+        "role": "unknown",
+        "role_confidence": 0.0,
         "status": "dry-run" if dry_run else "pending",
         "commands_run": 0,
         "failed_commands": [],
@@ -29,6 +31,10 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
         summary["platform"] = identity.get("platform", "unknown")
         summary["model"] = identity.get("model", "unknown")
         summary["identity_confidence"] = identity.get("confidence", 0.0)
+    role = device.metadata.get("role")
+    if role:
+        summary["role"] = role.get("role", "unknown")
+        summary["role_confidence"] = role.get("confidence", 0.0)
 
     raw_outputs: Dict[str, str] = {}
     failed_commands: List[str] = []

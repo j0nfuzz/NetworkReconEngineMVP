@@ -148,3 +148,23 @@ Date:
 
 Phase:
 PHASE-001-VendorPlatformIdentity
+
+Decision ID: DD-002
+
+Decision:
+Role classification uses deterministic hostname/model heuristics only; defer routing-table/LLDP-based inference to a later phase.
+
+Reason:
+Keeps PoC deterministic and testable, avoids new SSH commands until role-aware profiles are needed.
+
+Status:
+Proposed
+
+Approver:
+Pending GPT Reviewer
+
+Date:
+2026-08-04
+
+Phase:
+PHASE-002-RoleDetection

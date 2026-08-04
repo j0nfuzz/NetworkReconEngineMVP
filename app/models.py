@@ -61,3 +61,9 @@ class DeviceIdentity:
     platform: str = "unknown"
     model: str = "unknown"
     confidence: float = 0.0
+
+
+@dataclass
+class DeviceRole:
+    role: str = "unknown"
+    confidence: float = 0.0
