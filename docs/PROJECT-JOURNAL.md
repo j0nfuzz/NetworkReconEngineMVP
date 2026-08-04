@@ -443,6 +443,145 @@ Next Recommended Action:
 
 ---
 
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-008-CredentialManagement
+
+Changes:
+- Re-reviewed rejection basis for enable_password coverage.
+
+Reason:
+- Merge logic applies identically across username, password, and enable_password via the shared field loop; missing test was a coverage gap, not a defect. Approved.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Select next implementation phase.
+
+---
+
+Date: 2026-08-05
+Agent: Claude
+
+Phase: PHASE-009-RecursiveNeighborCollection
+
+Changes:
+- Selected Recursive Neighbor Collection as next implementation phase (Wishlist Phase 7).
+
+Reason:
+- Classification (PHASE-007) and credential defaults (PHASE-008) are now both implemented but unused; recursive collection is the smallest phase that wires existing execute_device_collection, classify_neighbors, and default credentials into an actual discovery loop, and is a prerequisite for Wishlist Phase 9 (parallel) and Phase 10 (checkpointing).
+
+Risks Introduced:
+- None (selection only).
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-009-RecursiveNeighborCollection.md.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-009-RecursiveNeighborCollection
+
+Changes:
+- Added app/orchestrator.py with run_recursive_collection() to drive seed-based collection, classify discovered neighbors, and recursively collect only supported neighbors.
+- Preserved existing execute_device_collection(), classify_neighbors(), and Device behaviour.
+- Used default credential inheritance from PHASE-008 for discovered devices.
+- Added tests/test_orchestrator.py covering supported enqueue, unsupported exclusion, traversal termination, failed collection, duplicate-neighbor avoidance, and missing-IP handling.
+
+Reason:
+- Wires existing classification, credential defaulting, and collection components into the smallest possible recursive discovery loop without concurrency or persistence scope.
+
+Risks Introduced:
+- Plaintext default credentials propagated to discovered neighbors (accepted PoC limitation).
+- No checkpoint persistence across failures.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Review PHASE-009-RecursiveNeighborCollection.
+
+---
+
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-009-RecursiveNeighborCollection
+
+Changes:
+- Reviewed recursive collection and regression coverage.
+
+Reason:
+- Discovered devices do not consistently use default credentials, and sibling duplicate names can enter the collection queue more than once.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-009A-RecursiveNeighborCollectionRemediation.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-009A-RecursiveNeighborCollectionRemediation
+
+Changes:
+- Fixed run_recursive_collection() so discovered neighbors use default_credentials only, not parent device credentials.
+- Added queued set to prevent duplicate neighbor names from entering the collection queue before collection.
+- Updated tests/test_orchestrator.py to assert default credential inheritance and duplicate neighbor suppression.
+
+Reason:
+- Resolves the two accepted review findings in PHASE-009 with the smallest corrective change, without adding traverse_topology() integration.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Parent credential leakage to discovered neighbors.
+- Redundant queueing of the same neighbor by multiple parents.
+
+Next Recommended Action:
+- Re-review PHASE-009A-RecursiveNeighborCollectionRemediation.
+
+---
+
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-009A-RecursiveNeighborCollectionRemediation
+
+Changes:
+- Reviewed default credential inheritance and queue-level duplicate suppression.
+
+Reason:
+- Discovered neighbors now use only default_credentials; queued prevents pre-collection duplicates. Focused regression tests pass.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Parent credential inheritance and duplicate queue entries.
+
+Next Recommended Action:
+- Select ParallelCollection.
+
+---
+
 ## Example Entry
 
 ```text
