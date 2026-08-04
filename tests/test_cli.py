@@ -9,6 +9,7 @@ import app.collector as collector_module
 from app.cli import parse_args, probe_devices, _is_legacy_error
 from app.collector import execute_device_collection, write_bundle
 from app.detector import detect_vendor_from_show_version
+from app.discovery import extract_neighbors
 from app.models import Device, DeviceBundle
 from app.ssh_client import DeviceSSHClient
 from app.vendor_profiles import get_vendor_commands, validate_device_command_set
@@ -257,6 +258,32 @@ def test_vendor_commands_unmatched_role_falls_back():
     commands = get_vendor_commands("cisco", role="firewall")
     assert "show version" in commands
     assert "show interfaces status" in commands
+
+
+def test_extract_neighbors_cisco_cdp():
+    output = """\nDevice ID: SW02\nEntry address(es):\n  IP address: 10.0.0.2\nPlatform: cisco WS-C2960-24TC-L,  Capabilities: Switch IGMP\nInterface: GigabitEthernet1/0/1,  Port ID (outgoing port): GigabitEthernet0/1\nHoldtime : 148 sec\n\nDevice ID: FW01\nEntry address(es):\n  IP address: 10.0.0.254\nPlatform: cisco ASA-5510,  Capabilities: Host Firewall\nInterface: GigabitEthernet1/0/2,  Port ID (outgoing port): Ethernet0/0\nHoldtime : 120 sec\n"""
+    neighbors = extract_neighbors("cisco", {"show cdp neighbors detail": output})
+    by_name = {n["neighbor"]: n for n in neighbors}
+    assert by_name["SW02"]["ip"] == "10.0.0.2"
+    assert by_name["FW01"]["ip"] == "10.0.0.254"
+    assert all(n["source"] == "show cdp neighbors detail" for n in neighbors)
+
+
+def test_extract_neighbors_returns_empty_when_no_discovery_output():
+    neighbors = extract_neighbors("cisco", {"show version": "Cisco IOS XE Software"})
+    assert neighbors == []
+
+
+def test_execute_device_collection_dry_run_has_empty_neighbors():
+    device = Device(
+        name="test-device",
+        hostname="10.0.0.1",
+        vendor="cisco",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+    bundle = execute_device_collection(device, dry_run=True)
+    assert bundle.summary["discovered_neighbors"] == []
 
 
 def test_ssh_client_retries_on_legacy_kex_failure(monkeypatch):

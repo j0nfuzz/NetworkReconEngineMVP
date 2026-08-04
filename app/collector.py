@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
+from app.discovery import extract_neighbors
 from app.models import CommandResult, Device, DeviceBundle
 from app.ssh_client import DeviceSSHClient
 from app.vendor_profiles import get_vendor_commands, validate_device_command_set
@@ -22,6 +23,7 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
         "identity_confidence": 0.0,
         "role": "unknown",
         "role_confidence": 0.0,
+        "discovered_neighbors": [],
         "status": "dry-run" if dry_run else "pending",
         "commands_run": 0,
         "failed_commands": [],
@@ -109,6 +111,7 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
 
     summary["status"] = "collected" if not failed_commands else "partial"
     summary["failed_commands"] = failed_commands
+    summary["discovered_neighbors"] = extract_neighbors(device.vendor, raw_outputs)
     return DeviceBundle(
         device_name=device.name,
         device_vendor=device.vendor,

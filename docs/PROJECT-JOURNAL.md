@@ -143,6 +143,52 @@ Next Recommended Action:
 
 ---
 
+Date: 2026-08-04
+Agent: Claude
+
+Phase: PHASE-004-DeviceDiscovery
+
+Changes:
+- Selected Device Discovery as next implementation phase (Wishlist Phase 4).
+
+Reason:
+- PHASE-003 already collects CDP/LLDP raw output; parsing it into a neighbour list reduces uncertainty for the Phase 5 topology graph and Phase 6 traversal engine before any recursive connection logic is built.
+
+Risks Introduced:
+- None (selection only).
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-004-DeviceDiscovery.md.
+
+---
+
+Date: 2026-08-04
+Agent: Kimi
+
+Phase: PHASE-004-DeviceDiscovery
+
+Changes:
+- Added app/discovery.py with extract_neighbors() for CDP/LLDP raw output.
+- collector.py stores discovered_neighbors in bundle.summary.
+- Added tests for Cisco CDP extraction, empty fallback, and dry-run handling.
+
+Reason:
+- Convert already-collected neighbor command output into structured neighbor records.
+
+Risks Introduced:
+- Regex-based parsing may miss neighbors on non-standard output formats.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Review PHASE-004 and select next phase.
+
+---
+
 ## Example Entry
 
 ```text
