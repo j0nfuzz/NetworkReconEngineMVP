@@ -8,6 +8,7 @@ import paramiko
 import app.collector as collector_module
 from app.cli import parse_args, probe_devices, _is_legacy_error
 from app.collector import execute_device_collection, write_bundle
+from app.classification import classify_neighbor_support, classify_neighbors
 from app.detector import detect_vendor_from_show_version
 from app.discovery import extract_neighbors
 from app.models import Device, DeviceBundle
@@ -274,6 +275,61 @@ def test_extract_neighbors_cisco_cdp():
 def test_extract_neighbors_returns_empty_when_no_discovery_output():
     neighbors = extract_neighbors("cisco", {"show version": "Cisco IOS XE Software"})
     assert neighbors == []
+
+
+def test_extract_neighbors_cisco_cdp_captures_platform():
+    output = """\nDevice ID: SW02\nEntry address(es):\n  IP address: 10.0.0.2\nPlatform: cisco WS-C2960-24TC-L,  Capabilities: Switch IGMP\nInterface: GigabitEthernet1/0/1,  Port ID (outgoing port): GigabitEthernet0/1\nHoldtime : 148 sec\n"""
+    neighbors = extract_neighbors("cisco", {"show cdp neighbors detail": output})
+    by_name = {n["neighbor"]: n for n in neighbors}
+    assert by_name["SW02"]["platform"] == "cisco WS-C2960-24TC-L"
+
+
+def test_extract_neighbors_cisco_cdp_captures_platform_at_end_of_string():
+    output = "Device ID: SW03\nEntry address(es):\n  IP address: 10.0.0.3\nPlatform: cisco WS-C2960-24TC-L"
+    neighbors = extract_neighbors("cisco", {"show cdp neighbors detail": output})
+    assert len(neighbors) == 1
+    assert neighbors[0]["neighbor"] == "SW03"
+    assert neighbors[0]["platform"] == "cisco WS-C2960-24TC-L"
+    assert classify_neighbor_support(neighbors[0]) == "cisco"
+
+
+def test_classify_neighbor_support_recognizes_supported_vendors():
+    assert classify_neighbor_support({"platform": "cisco WS-C2960-24TC-L"}) == "cisco"
+    assert classify_neighbor_support({"platform": "Aruba 6300M"}) == "aruba"
+    assert classify_neighbor_support({"platform": "FortiGate-100F"}) == "fortigate"
+    assert classify_neighbor_support({"platform": "Juniper Networks ex4300"}) == "juniper"
+
+
+def test_classify_neighbor_support_marks_unsupported_devices():
+    assert classify_neighbor_support({"platform": "HP LaserJet Printer"}) == "unsupported"
+    assert classify_neighbor_support({"platform": "APC Smart-UPS 3000"}) == "unsupported"
+    assert classify_neighbor_support({"platform": "Polycom SoundPoint IP Phone"}) == "unsupported"
+
+
+def test_classify_neighbor_support_unknown_when_no_platform():
+    assert classify_neighbor_support({"neighbor": "SW02"}) == "unknown"
+    assert classify_neighbor_support({"platform": ""}) == "unknown"
+
+
+def test_classify_neighbors_returns_classification_per_name():
+    neighbors = [
+        {"neighbor": "SW02", "platform": "cisco WS-C2960-24TC-L"},
+        {"neighbor": "PR01", "platform": "HP LaserJet Printer"},
+        {"neighbor": "UNKNOWN"},
+    ]
+    result = classify_neighbors(neighbors)
+    assert result == {
+        "SW02": "cisco",
+        "PR01": "unsupported",
+        "UNKNOWN": "unknown",
+    }
+
+
+def test_classify_neighbors_does_not_mutate_input():
+    neighbors = [{"neighbor": "SW02", "platform": "cisco WS-C2960-24TC-L"}]
+    _ = classify_neighbors(neighbors)
+    assert "classification" not in neighbors[0]
+
 
 
 def test_execute_device_collection_dry_run_has_empty_neighbors():

@@ -28,6 +28,7 @@ def _parse_cdp_neighbors(output: str, source_command: str) -> List[Dict[str, str
     for entry in entries:
         device_match = re.search(r"Device ID:\s*(.+)", entry, re.IGNORECASE)
         ip_match = re.search(r"IP address:\s*(\S+)", entry, re.IGNORECASE)
+        platform_match = re.search(r"Platform:\s*(.+?)(?:,\s*Capabilities:|\n|$)", entry, re.IGNORECASE)
         if not device_match:
             continue
         neighbor = {
@@ -36,6 +37,8 @@ def _parse_cdp_neighbors(output: str, source_command: str) -> List[Dict[str, str
         }
         if ip_match:
             neighbor["ip"] = ip_match.group(1).strip()
+        if platform_match:
+            neighbor["platform"] = platform_match.group(1).strip()
         neighbors.append(neighbor)
 
     return neighbors

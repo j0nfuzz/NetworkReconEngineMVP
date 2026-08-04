@@ -306,6 +306,76 @@ Next Recommended Action:
 
 ---
 
+Date: 2026-08-04
+Agent: Claude
+
+Phase: PHASE-007-NeighborSupportClassification
+
+Changes:
+- Selected Neighbor Support Classification as next implementation phase (precursor to Wishlist Phase 7).
+
+Reason:
+- Recursive neighbour collection (Wishlist Phase 7) requires knowing which discovered neighbours are supported vendors before any connection is attempted; the CDP "Platform:" line is already collected but unparsed, and Phase 8 credentials do not yet exist, so classification is the smallest safe unlock.
+
+Risks Introduced:
+- None (selection only).
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-007-NeighborSupportClassification.md.
+
+---
+
+Date: 2026-08-04
+Agent: Kimi
+
+Phase: PHASE-007-NeighborSupportClassification
+
+Changes:
+- Added "platform" capture to _parse_cdp_neighbors() in app/discovery.py.
+- Added app/classification.py with classify_neighbor_support() and classify_neighbors().
+- Added tests for platform capture, supported vendor recognition, unsupported devices, missing platform, and non-mutation.
+
+Reason:
+- Recursive neighbour collection (Phase 7) needs to know which discovered neighbors are supported vendors before attempting SSH connections.
+
+Risks Introduced:
+- CDP platform regex may miss non-standard formats, classifying them as "unknown".
+- Keyword matching may misclassify uncommon/rebranded hardware.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Review PHASE-007-NeighborSupportClassification.
+
+---
+
+Date: 2026-08-04
+Agent: Kimi
+
+Phase: PHASE-007A-NeighborSupportClassificationRemediation
+
+Changes:
+- Fixed _parse_cdp_neighbors() platform regex to accept end-of-string terminator.
+- Added regression test for final-line `Platform:` capture and downstream classification.
+
+Reason:
+- Reviewer found valid CDP records with `Platform:` as the last line lost platform evidence and were misclassified as "unknown".
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Final-line CDP platform parsing defect.
+
+Next Recommended Action:
+- Re-review PHASE-007A-NeighborSupportClassificationRemediation.
+
+---
+
 ## Example Entry
 
 ```text
