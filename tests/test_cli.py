@@ -13,6 +13,7 @@ from app.discovery import extract_neighbors
 from app.models import Device, DeviceBundle
 from app.ssh_client import DeviceSSHClient
 from app.topology import build_topology_graph
+from app.traversal import traverse_topology
 from app.vendor_profiles import get_vendor_commands, validate_device_command_set
 
 
@@ -411,3 +412,77 @@ def test_build_topology_graph_from_generator_produces_edges():
     assert set(graph["nodes"].keys()) == {"SW01", "SW02"}
     assert {"source": "SW01", "target": "SW02"} in graph["edges"]
     assert {"source": "SW02", "target": "SW01"} in graph["edges"]
+
+
+def _build_graph(summaries):
+    return build_topology_graph(summaries)
+
+
+def test_traverse_topology_linear_chain():
+    graph = _build_graph([
+        {"device": "A", "vendor": "cisco", "role": "switch", "discovered_neighbors": [{"neighbor": "B"}]},
+        {"device": "B", "vendor": "cisco", "role": "switch", "discovered_neighbors": [{"neighbor": "C"}]},
+        {"device": "C", "vendor": "cisco", "role": "switch", "discovered_neighbors": []},
+    ])
+    result = traverse_topology(graph, "A")
+    assert result["successful"] == ["A", "B", "C"]
+    assert result["visited"] == result["successful"]
+    assert result["pending"] == []
+    assert result["failed"] == []
+
+
+def test_traverse_topology_cycle_prevents_revisit():
+    graph = _build_graph([
+        {"device": "A", "vendor": "cisco", "role": "switch", "discovered_neighbors": [{"neighbor": "B"}]},
+        {"device": "B", "vendor": "cisco", "role": "switch", "discovered_neighbors": [{"neighbor": "A"}]},
+    ])
+    result = traverse_topology(graph, "A")
+    assert result["successful"] == ["A", "B"]
+    assert result["visited"] == result["successful"]
+    assert result["pending"] == []
+    assert result["failed"] == []
+
+
+def test_traverse_topology_branching():
+    graph = _build_graph([
+        {"device": "A", "vendor": "cisco", "role": "switch", "discovered_neighbors": [{"neighbor": "B"}, {"neighbor": "C"}]},
+        {"device": "B", "vendor": "cisco", "role": "switch", "discovered_neighbors": []},
+        {"device": "C", "vendor": "cisco", "role": "switch", "discovered_neighbors": []},
+    ])
+    result = traverse_topology(graph, "A")
+    assert result["successful"] == ["A", "B", "C"]
+    assert result["visited"] == result["successful"]
+    assert result["pending"] == []
+    assert result["failed"] == []
+
+
+def test_traverse_topology_orphaned_neighbor_is_failed():
+    graph = _build_graph([
+        {"device": "A", "vendor": "cisco", "role": "switch", "discovered_neighbors": [{"neighbor": "MISSING"}]},
+    ])
+    result = traverse_topology(graph, "A")
+    assert result["successful"] == ["A"]
+    assert result["pending"] == []
+    assert result["failed"] == ["MISSING"]
+
+
+def test_traverse_topology_single_node():
+    graph = _build_graph([
+        {"device": "A", "vendor": "cisco", "role": "switch", "discovered_neighbors": []},
+    ])
+    result = traverse_topology(graph, "A")
+    assert result["successful"] == ["A"]
+    assert result["pending"] == []
+    assert result["failed"] == []
+
+
+def test_traverse_topology_missing_start_is_failed():
+    graph = _build_graph([
+        {"device": "A", "vendor": "cisco", "role": "switch", "discovered_neighbors": []},
+    ])
+    result = traverse_topology(graph, "MISSING")
+    assert result["successful"] == []
+    assert result["failed"] == ["MISSING"]
+    assert result["visited"] == []
+    assert result["pending"] == ["A"]
+

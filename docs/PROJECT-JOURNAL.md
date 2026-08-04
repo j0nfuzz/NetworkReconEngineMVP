@@ -258,6 +258,54 @@ Next Recommended Action:
 
 ---
 
+Date: 2026-08-04
+Agent: Kimi
+
+Phase: PHASE-006-TraversalEngine
+
+Changes:
+- Added app/traversal.py with traverse_topology() for deterministic BFS.
+- Added tests for linear chain, cycle prevention, branching, orphaned neighbour, single-node, and missing start.
+
+Reason:
+- PHASE-005/005A produce a correct graph; loop-safe traversal is required before Phase 7 recursive collection.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Review PHASE-006-TraversalEngine.
+
+---
+
+Date: 2026-08-04
+Agent: Kimi
+
+Phase: PHASE-006A-TraversalEngineRemediation
+
+Changes:
+- Fixed `visited` ordering in app/traversal.py to use deterministic BFS order.
+- Fixed missing start-node path to report all graph nodes as `pending`.
+- Updated traversal tests to assert `visited` order and missing-start pending.
+
+Reason:
+- Reviewer found `visited` was returned from an unordered set and missing start reported `pending: []` despite unvisited graph nodes.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Non-deterministic `visited` ordering.
+- Missing start-node pending under-reporting.
+
+Next Recommended Action:
+- Re-review PHASE-006A-TraversalEngineRemediation.
+
+---
+
 ## Example Entry
 
 ```text
