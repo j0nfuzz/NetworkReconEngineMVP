@@ -72,6 +72,30 @@ Do not include:
 
 ---
 
+Date: 2026-08-04
+Agent: Kimi
+
+Phase: PHASE-002A-RoleDetectionRemediation
+
+Changes:
+- app/cli.py now classifies role for every device, not only vendor="auto".
+- Configured-vendor devices use a synthetic DeviceIdentity(vendor=device.vendor).
+- Added tests/test_cli.py::test_configured_vendor_device_gets_role_classified.
+
+Reason:
+- Reviewer found configured-vendor devices bypassed classify_role(); acceptance criteria required role storage for all CLI paths.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Configured-vendor role classification gap.
+
+Next Recommended Action:
+- Re-review PHASE-002A and DD-002.
+
+---
+
 ## Example Entry
 
 ```text

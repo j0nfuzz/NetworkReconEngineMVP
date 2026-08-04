@@ -191,6 +191,53 @@ def test_probe_devices_classification(monkeypatch):
     assert by_name["unreachable"] == "unreachable"
 
 
+def test_configured_vendor_device_gets_role_classified(monkeypatch, tmp_path):
+    """Configured-vendor devices must receive role classification without SSH probing."""
+    device_dict = {
+        "name": "dist-sw01",
+        "hostname": "10.0.0.10",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    captured_device = None
+
+    def fake_execute(device, dry_run=False):
+        nonlocal captured_device
+        captured_device = device
+        return DeviceBundle(
+            device_name=device.name,
+            device_vendor=device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+
+    monkeypatch.setattr("app.cli.execute_device_collection", fake_execute)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: tmp_path / "bundle")
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--dry-run",
+    ])
+
+    from app.cli import main
+
+    result = main()
+    assert result == 0
+    assert captured_device is not None
+    assert captured_device.metadata["role"]["role"] == "switch"
+    assert captured_device.metadata["role"]["confidence"] > 0
+
+
 def test_ssh_client_retries_on_legacy_kex_failure(monkeypatch):
     calls = {"count": 0}
 

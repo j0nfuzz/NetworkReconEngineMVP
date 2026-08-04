@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 from app.collector import execute_device_collection, write_bundle
 from app.config import load_devices
 from app.detector import classify_role, identify_device
-from app.models import Device
+from app.models import Device, DeviceIdentity
 
 
 def parse_args() -> argparse.Namespace:
@@ -138,6 +138,16 @@ def main() -> int:
             except Exception as exc:
                 log_verbose(f"[verbose] Auto-detect failed for {device.hostname}: {exc}")
                 device.vendor = "generic"
+
+        if "role" not in device.metadata:
+            identity = device.metadata.get("identity")
+            identity_obj = DeviceIdentity(**identity) if identity else DeviceIdentity(vendor=device.vendor)
+            role = classify_role(identity_obj, device.name)
+            device.metadata["role"] = {"role": role.role, "confidence": role.confidence}
+            log_verbose(
+                f"[verbose] Classified role for {device.hostname}: "
+                f"role={role.role}, confidence={role.confidence}"
+            )
 
         bundle = execute_device_collection(device, dry_run=args.dry_run)
         if verbose:
