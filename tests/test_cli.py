@@ -12,6 +12,7 @@ from app.detector import detect_vendor_from_show_version
 from app.discovery import extract_neighbors
 from app.models import Device, DeviceBundle
 from app.ssh_client import DeviceSSHClient
+from app.topology import build_topology_graph
 from app.vendor_profiles import get_vendor_commands, validate_device_command_set
 
 
@@ -286,6 +287,49 @@ def test_execute_device_collection_dry_run_has_empty_neighbors():
     assert bundle.summary["discovered_neighbors"] == []
 
 
+def test_build_topology_graph_links_connected_devices():
+    summaries = [
+        {
+            "device": "SW01",
+            "vendor": "cisco",
+            "role": "switch",
+            "discovered_neighbors": [{"neighbor": "SW02", "source": "show cdp neighbors detail"}],
+        },
+        {
+            "device": "SW02",
+            "vendor": "cisco",
+            "role": "switch",
+            "discovered_neighbors": [{"neighbor": "SW01", "source": "show cdp neighbors detail"}],
+        },
+    ]
+    graph = build_topology_graph(summaries)
+    assert "SW01" in graph["nodes"]
+    assert "SW02" in graph["nodes"]
+    assert "SW02" in graph["nodes"]["SW01"]["neighbors"]
+    assert "SW01" in graph["nodes"]["SW02"]["neighbors"]
+    assert len(graph["edges"]) == 2
+
+
+def test_build_topology_graph_isolated_node():
+    summaries = [
+        {
+            "device": "SW01",
+            "vendor": "cisco",
+            "role": "switch",
+            "discovered_neighbors": [],
+        }
+    ]
+    graph = build_topology_graph(summaries)
+    assert graph["nodes"]["SW01"]["neighbors"] == []
+    assert graph["edges"] == []
+
+
+def test_build_topology_graph_empty_input():
+    graph = build_topology_graph([])
+    assert graph["nodes"] == {}
+    assert graph["edges"] == []
+
+
 def test_ssh_client_retries_on_legacy_kex_failure(monkeypatch):
     calls = {"count": 0}
 
@@ -345,3 +389,25 @@ def test_ssh_client_includes_supported_kex_fallbacks(monkeypatch):
     assert all(name in getattr(paramiko.Transport, "_kex_info", {}) for name in preferred)
     paramiko.Transport._preferred_kex = tuple(original)
     paramiko.Transport._kex_info = original_info
+
+
+def test_build_topology_graph_from_generator_produces_edges():
+    """Regression test for generator-consumption bug: edges must be produced."""
+    summaries = (
+        {
+            "device": "SW01",
+            "vendor": "cisco",
+            "role": "switch",
+            "discovered_neighbors": [{"neighbor": "SW02"}],
+        },
+        {
+            "device": "SW02",
+            "vendor": "cisco",
+            "role": "switch",
+            "discovered_neighbors": [{"neighbor": "SW01"}],
+        },
+    )
+    graph = build_topology_graph(summary for summary in summaries)
+    assert set(graph["nodes"].keys()) == {"SW01", "SW02"}
+    assert {"source": "SW01", "target": "SW02"} in graph["edges"]
+    assert {"source": "SW02", "target": "SW01"} in graph["edges"]

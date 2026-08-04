@@ -189,6 +189,75 @@ Next Recommended Action:
 
 ---
 
+Date: 2026-08-04
+Agent: Claude
+
+Phase: PHASE-005-TopologyGraph
+
+Changes:
+- Selected Topology Graph as next implementation phase (Wishlist Phase 5).
+
+Reason:
+- PHASE-004 now produces discovered_neighbors per device; converting that into a graph structure is required before any traversal engine (Phase 6) can operate, and needs no new collection logic.
+
+Risks Introduced:
+- None (selection only).
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-005-TopologyGraph.md.
+
+---
+
+Date: 2026-08-04
+Agent: Kimi
+
+Phase: PHASE-005-TopologyGraph
+
+Changes:
+- Added app/topology.py with build_topology_graph() consuming device summaries.
+- cli.py writes topology.json alongside bundle_manifest.json.
+- Added tests for connected devices, isolated node, and empty graph.
+
+Reason:
+- Convert discovered_neighbors into a deterministic graph structure for future traversal.
+
+Risks Introduced:
+- Neighbour name mismatches can produce edges to absent nodes.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Review PHASE-005 and select next phase.
+
+---
+
+Date: 2026-08-04
+Agent: Kimi
+
+Phase: PHASE-005A-TopologyGraphRemediation
+
+Changes:
+- Materialized `summaries` iterable to a list at the start of build_topology_graph() in app/topology.py.
+- Added tests/test_cli.py::test_build_topology_graph_from_generator_produces_edges.
+
+Reason:
+- Reviewer found build_topology_graph() consumed the generator in its first pass, so cli.py's generator input produced nodes but no edges.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Generator-consumption bug in topology graph construction.
+
+Next Recommended Action:
+- Re-review PHASE-005A and confirm no regressions.
+
+---
+
 ## Example Entry
 
 ```text

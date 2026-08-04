@@ -9,6 +9,7 @@ from app.collector import execute_device_collection, write_bundle
 from app.config import load_devices
 from app.detector import classify_role, identify_device
 from app.models import Device, DeviceIdentity
+from app.topology import build_topology_graph
 
 
 def parse_args() -> argparse.Namespace:
@@ -158,10 +159,15 @@ def main() -> int:
             "vendor": device.vendor,
             "bundle_path": str(bundle_path),
             "status": bundle.summary.get("status"),
+            "summary": bundle.summary,
         })
 
     manifest_path = output_root / "bundle_manifest.json"
     manifest_path.write_text(json.dumps(bundle_summary, indent=2), encoding="utf-8")
+
+    topology = build_topology_graph(device["summary"] for device in bundle_summary["devices"])
+    topology_path = output_root / "topology.json"
+    topology_path.write_text(json.dumps(topology, indent=2), encoding="utf-8")
 
     print(f"Generated bundle manifest: {manifest_path}")
     return 0
