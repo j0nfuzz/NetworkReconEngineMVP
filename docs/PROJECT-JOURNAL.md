@@ -376,6 +376,73 @@ Next Recommended Action:
 
 ---
 
+Date: 2026-08-04
+Agent: Claude
+
+Phase: PHASE-008-CredentialManagement
+
+Changes:
+- Selected Credential Management as next implementation phase (Wishlist Phase 8).
+
+Reason:
+- load_devices() currently requires every device entry to carry its own username/password; a global default with per-device override is the smallest change that reduces config duplication and matches Wishlist Phase 8's "minimal prompting, reusable" objective without introducing vault/encryption scope.
+
+Risks Introduced:
+- None (selection only).
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-008-CredentialManagement.md.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-008-CredentialManagement
+
+Changes:
+- load_devices() now merges an optional top-level `default` credentials block into each device entry, filling only missing username/password/enable_password fields; per-device values always take precedence.
+- Added tests/test_config.py covering full inheritance, partial override, full override, and legacy configs without a default block.
+
+Reason:
+- Implements PHASE-008-CredentialManagement acceptance criteria with the smallest additive change, preserving backward compatibility for configs without a default block.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Review PHASE-008-CredentialManagement.
+
+---
+
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-008-CredentialManagement
+
+Changes:
+- Reviewed default credential merging and regression coverage.
+
+Reason:
+- Required full-override coverage does not demonstrate `enable_password` precedence.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-008A-CredentialManagementRemediation.
+
+---
+
 ## Example Entry
 
 ```text
