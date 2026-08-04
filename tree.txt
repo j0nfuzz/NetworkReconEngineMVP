@@ -3,16 +3,13 @@ Volume serial number is 6003-0716
 C:.
 ¦   .gitignore
 ¦   interactive_bootstrap.ps1
-¦   PROJECT-STANDARD.md
 ¦   README.md
 ¦   requirements-legacy.txt
 ¦   requirements.txt
 ¦   tree.txt
-¦   Wishes-Claud-Sonnet-5.md
-¦   Wishes-Claude-Validation.md
+¦   Wishes-Claude-Sonnet-5.md
 ¦   Wishes-GPT5.6-Sonnet.md
 ¦   Wishes-Kimi-K2.7-Code.md
-¦   Wishlist.md
 ¦   
 +---.pytest_cache
 ¦   ¦   .gitignore
@@ -6628,6 +6625,13 @@ C:.
 ¦           show_version.txt
 ¦           summary.json
 ¦           
++---docs
+¦       DESIGN-DECISION-REGISTER.md
+¦       PROJECT-JOURNAL.md
+¦       PROJECT-STANDARD.md
+¦       tree.txt
+¦       Wishlist.md
+¦       
 +---live_output
 ¦   ¦   bundle_manifest.json
 ¦   ¦   sample-aruba-switch.zip
@@ -6652,6 +6656,11 @@ C:.
 ¦   ¦   
 ¦   +---interactive-device
 ¦           ai_prompt.txt
+¦           show_arp.txt
+¦           show_interfaces.txt
+¦           show_ip_route.txt
+¦           show_system_uptime.txt
+¦           show_version.txt
 ¦           summary.json
 ¦           
 +---tests

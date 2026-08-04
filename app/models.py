@@ -53,3 +53,11 @@ class DeviceBundle:
     summary: Dict[str, Any]
     raw_outputs: Dict[str, str] = field(default_factory=dict)
     failed_commands: List[str] = field(default_factory=list)
+
+
+@dataclass
+class DeviceIdentity:
+    vendor: str = "generic"
+    platform: str = "unknown"
+    model: str = "unknown"
+    confidence: float = 0.0

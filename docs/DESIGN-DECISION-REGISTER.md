@@ -128,3 +128,23 @@ Avoid:
 - Long discussions
 - Repeating journal history
 - Restating project goals
+
+Decision ID: DD-001
+
+Decision:
+Introduce a structured DeviceIdentity returned by identify_device().
+
+Reason:
+Separate vendor detection from CLI logic and enable future role detection.
+
+Status:
+Approved
+
+Approver:
+GPT Reviewer
+
+Date:
+2026-08-04
+
+Phase:
+PHASE-001-VendorPlatformIdentity

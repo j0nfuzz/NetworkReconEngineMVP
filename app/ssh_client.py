@@ -127,12 +127,22 @@ class DeviceSSHClient:
         if client is None:
             client = self.connect()
 
-        stdin, stdout, stderr = client.exec_command(command, timeout=self.timeout)
-        # Drain stdout/stderr before blocking on the exit status to avoid a
-        # deadlock on large command output.
-        stdout_data = stdout.read().decode("utf-8", errors="replace")
-        stderr_data = stderr.read().decode("utf-8", errors="replace")
-        exit_code = stdout.channel.recv_exit_status()
+        try:
+            stdin, stdout, stderr = client.exec_command(command, timeout=self.timeout)
+            # Drain stdout/stderr before blocking on the exit status to avoid a
+            # deadlock on large command output.
+            stdout_data = stdout.read().decode("utf-8", errors="replace")
+            stderr_data = stderr.read().decode("utf-8", errors="replace")
+            exit_code = stdout.channel.recv_exit_status()
+        except (socket.timeout, TimeoutError, EOFError, paramiko.ssh_exception.SSHException, OSError) as exc:
+            return {
+                "command": command,
+                "stdout": "",
+                "stderr": "",
+                "exit_code": -1,
+                "success": False,
+                "error": f"Command timed out or failed: {exc}",
+            }
 
         return {
             "command": command,

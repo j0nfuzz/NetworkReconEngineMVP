@@ -17,10 +17,18 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
         "device": device.name,
         "hostname": device.hostname,
         "vendor": device.vendor,
+        "platform": "unknown",
+        "model": "unknown",
+        "identity_confidence": 0.0,
         "status": "dry-run" if dry_run else "pending",
         "commands_run": 0,
         "failed_commands": [],
     }
+    identity = device.metadata.get("identity")
+    if identity:
+        summary["platform"] = identity.get("platform", "unknown")
+        summary["model"] = identity.get("model", "unknown")
+        summary["identity_confidence"] = identity.get("confidence", 0.0)
 
     raw_outputs: Dict[str, str] = {}
     failed_commands: List[str] = []
@@ -66,7 +74,20 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
             failed_commands=commands,
         )
 
-    connection = ssh_client.connect()
+    try:
+        connection = ssh_client.connect()
+    except Exception as exc:
+        summary["status"] = "unreachable"
+        summary["error"] = str(exc)
+        return DeviceBundle(
+            device_name=device.name,
+            device_vendor=device.vendor,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            summary=summary,
+            raw_outputs=raw_outputs,
+            failed_commands=commands,
+        )
+
     try:
         for command in commands:
             result = ssh_client.run_command(command, client=connection)

@@ -214,6 +214,19 @@ def test_ssh_client_retries_on_legacy_kex_failure(monkeypatch):
     assert calls["count"] == 2
 
 
+def test_run_command_returns_failure_for_eof_error():
+    class FakeSSHClient:
+        def exec_command(self, command, timeout=None):
+            raise EOFError("remote closed connection")
+
+    client = DeviceSSHClient("device.example", "user", "pass")
+    result = client.run_command("show version", client=FakeSSHClient())
+
+    assert result["success"] is False
+    assert result["exit_code"] == -1
+    assert "remote closed connection" in result["error"]
+
+
 def test_ssh_client_includes_supported_kex_fallbacks(monkeypatch):
     original = list(getattr(paramiko.Transport, "_preferred_kex", ()))
     original_info = dict(getattr(paramiko.Transport, "_kex_info", {}))

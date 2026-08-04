@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 from app.collector import execute_device_collection, write_bundle
 from app.config import load_devices
-from app.detector import detect_vendor_from_show_version
+from app.detector import identify_device
 from app.models import Device
 
 
@@ -117,9 +117,18 @@ def main() -> int:
                     connection = client.connect()
                     try:
                         result = client.run_command("show version", client=connection)
-                        detected_vendor = detect_vendor_from_show_version(result.get("stdout", "")) or "generic"
-                        device.vendor = detected_vendor
-                        log_verbose(f"[verbose] Detected vendor for {device.hostname}: {detected_vendor}")
+                        identity = identify_device(result.get("stdout", ""))
+                        device.vendor = identity.vendor
+                        device.metadata["identity"] = {
+                            "vendor": identity.vendor,
+                            "platform": identity.platform,
+                            "model": identity.model,
+                            "confidence": identity.confidence,
+                        }
+                        log_verbose(
+                            f"[verbose] Detected identity for {device.hostname}: "
+                            f"vendor={identity.vendor}, platform={identity.platform}, model={identity.model}"
+                        )
                     finally:
                         client.close(connection)
                 else:
