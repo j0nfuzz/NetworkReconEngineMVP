@@ -259,19 +259,14 @@ Output only relevant deltas.
 
 ---
 
-## Phase Review File
+## Review File Generation
 
-Generate a review file suitable for storage alongside the phase.
+At completion generate and save:
 
-Recommended filename:
-
-```text
-REVIEW-PHASE-XXX-<PhaseName>.md
-```
+docs/Phases/REVIEW-PHASE-XXX-<PhaseName>.md
 
 Contents:
 
-```text
 REVIEW VERDICT:
 
 CRITICAL ISSUES:
@@ -285,9 +280,24 @@ OUTSTANDING RISKS:
 OPEN QUESTIONS:
 
 RECOMMENDED NEXT PHASE:
-```
 
-Do not duplicate information elsewhere.
+This file is the authoritative review artefact.
+
+If a DDR proposal is approved:
+
+- Update DESIGN-DECISION-REGISTER.md
+- Set Status: Approved
+- Set Approver: GPT Reviewer
+
+If a DDR proposal is rejected:
+
+- Update DESIGN-DECISION-REGISTER.md
+- Set Status: Rejected
+- Add rejection reason
+
+Do not modify implementation files.
+
+Do not modify phase files.
 
 ---
 

@@ -66,7 +66,7 @@ Date: 2026-08-04
 
 Reviewer: Claude (Architect)
 
-Verdict: Reviewer finding upheld — Rejected
+Verdict: Reviewer finding upheld — REJECTED
 
 Reason:
 

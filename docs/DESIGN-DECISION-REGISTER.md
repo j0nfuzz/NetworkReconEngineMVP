@@ -158,13 +158,33 @@ Reason:
 Keeps PoC deterministic and testable, avoids new SSH commands until role-aware profiles are needed.
 
 Status:
-Proposed
+Approved
 
 Approver:
-Pending GPT Reviewer
+GPT Reviewer
 
 Date:
 2026-08-04
 
 Phase:
-PHASE-002-RoleDetection
+PHASE-002-RoleDetection (remediated PHASE-002A-RoleDetectionRemediation)
+
+Decision ID: DD-003
+
+Decision:
+Extend vendor command profiles with an optional role dimension; role-unmatched vendor/role combinations fall back to the existing vendor-level profile.
+
+Reason:
+Enables role-appropriate collection depth (Wishlist Phase 3) without restructuring the existing VENDOR_PROFILES data or breaking vendor-only callers.
+
+Status:
+Approved
+
+Approver:
+GPT Reviewer
+
+Date:
+2026-08-04
+
+Phase:
+PHASE-003-VendorCommandProfiles

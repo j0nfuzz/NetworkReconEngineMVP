@@ -238,6 +238,27 @@ def test_configured_vendor_device_gets_role_classified(monkeypatch, tmp_path):
     assert captured_device.metadata["role"]["confidence"] > 0
 
 
+def test_vendor_commands_role_specific_cisco_switch():
+    commands = get_vendor_commands("cisco", role="switch")
+    assert "show version" in commands
+    assert "show mac address-table count" in commands
+    assert "show spanning-tree summary" in commands
+    assert "show ip route summary" not in commands
+
+
+def test_vendor_commands_role_specific_cisco_router():
+    commands = get_vendor_commands("cisco", role="router")
+    assert "show version" in commands
+    assert "show ip route summary" in commands
+    assert "show mac address-table count" not in commands
+
+
+def test_vendor_commands_unmatched_role_falls_back():
+    commands = get_vendor_commands("cisco", role="firewall")
+    assert "show version" in commands
+    assert "show interfaces status" in commands
+
+
 def test_ssh_client_retries_on_legacy_kex_failure(monkeypatch):
     calls = {"count": 0}
 

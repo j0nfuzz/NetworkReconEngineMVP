@@ -213,13 +213,9 @@ Do not repeat historical entries.
 
 ## Phase File Generation
 
-At completion generate a phase implementation record.
+At completion generate and save:
 
-Recommended filename:
-
-```text
-IMPLEMENTED-PHASE-XXX-<PhaseName>.md
-```
+docs/Phases/IMPLEMENTED-PHASE-XXX-<PhaseName>.md
 
 Contents:
 
@@ -234,6 +230,7 @@ FILES MODIFIED:
 TESTS ADDED:
 
 DDR UPDATES:
+(Proposed only. Do not approve DDR changes.)
 
 RISKS INTRODUCED:
 
@@ -242,10 +239,13 @@ RISKS RESOLVED:
 OPEN ISSUES:
 ```
 
-This file should be suitable for direct review by GPT.
+This file is the authoritative implementation artefact for GPT review.
 
 Do not duplicate implementation information elsewhere.
 
+Do not mark DDR decisions as Approved.
+Only propose updates.
+DDR approval is the responsibility of the Reviewer.
 ---
 
 ## Output Format

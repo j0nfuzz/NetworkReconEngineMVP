@@ -45,7 +45,7 @@ def validate_read_only_command(command: str) -> bool:
     return False
 
 
-VENDOR_PROFILES: Dict[str, Dict[str, List[str]]] = {
+VENDOR_PROFILES: Dict[str, Dict[str, Dict[str, List[str]]]] = {
     "cisco": {
         "commands": [
             "show version",
@@ -58,7 +58,30 @@ VENDOR_PROFILES: Dict[str, Dict[str, List[str]]] = {
             "show process cpu sorted",
             "show memory statistics",
             "show logging",
-        ]
+        ],
+        "roles": {
+            "switch": [
+                "show version",
+                "show inventory",
+                "show interfaces status",
+                "show interface counters errors",
+                "show spanning-tree summary",
+                "show mac address-table count",
+                "show cdp neighbors detail",
+                "show logging",
+                "show processes cpu sorted",
+                "show memory statistics",
+            ],
+            "router": [
+                "show version",
+                "show inventory",
+                "show interfaces",
+                "show ip route summary",
+                "show arp",
+                "show logging",
+                "show processes cpu sorted",
+            ],
+        },
     },
     "juniper": {
         "commands": [
@@ -110,14 +133,23 @@ VENDOR_PROFILES: Dict[str, Dict[str, List[str]]] = {
 }
 
 
-def get_vendor_commands(vendor: str) -> List[str]:
+def get_vendor_commands(vendor: str, role: str | None = None) -> List[str]:
     key = (vendor or "generic").lower()
     profile = VENDOR_PROFILES.get(key, VENDOR_PROFILES["generic"])
-    commands = list(profile.get("commands", []))
+    commands = _resolve_commands(profile, role)
     invalid = [cmd for cmd in commands if not validate_read_only_command(cmd)]
     if invalid:
         raise ValueError(f"Invalid non-read-only vendor commands detected: {invalid}")
     return commands
+
+
+def _resolve_commands(profile: Dict[str, Dict[str, List[str]]], role: str | None) -> List[str]:
+    if role:
+        role_key = role.lower()
+        role_commands = profile.get("roles", {}).get(role_key)
+        if role_commands:
+            return list(role_commands)
+    return list(profile.get("commands", []))
 
 
 def validate_device_command_set(commands: List[str]) -> List[str]:

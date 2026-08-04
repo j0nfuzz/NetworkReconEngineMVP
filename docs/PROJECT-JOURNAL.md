@@ -96,6 +96,53 @@ Next Recommended Action:
 
 ---
 
+Date: 2026-08-04
+Agent: Claude
+
+Phase: PHASE-003-VendorCommandProfiles
+
+Changes:
+- Selected Vendor Command Profiles as next implementation phase (Wishlist Phase 3).
+
+Reason:
+- PHASE-001/002 give vendor and role identity but collection still uses vendor-only command sets; role-aware profiles are the next highest-value step before topology discovery.
+
+Risks Introduced:
+- None (selection only).
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-003-VendorCommandProfiles.md.
+
+---
+
+Date: 2026-08-04
+Agent: Kimi
+
+Phase: PHASE-003-VendorCommandProfiles
+
+Changes:
+- Added optional role parameter to get_vendor_commands() with vendor-level fallback.
+- Added cisco switch/router role-specific read-only command lists.
+- collector.py passes device.metadata["role"]["role"] to get_vendor_commands().
+- Added tests for role match, role mismatch fallback, and profile contents.
+
+Reason:
+- Execute role-appropriate collection depth using PHASE-001/002 outputs.
+
+Risks Introduced:
+- Role misclassification selects wrong profile; limited to cisco switch/router for now.
+
+Risks Resolved:
+- Vendor/role metadata no longer ignored during command selection.
+
+Next Recommended Action:
+- Review and approve DD-003; select next phase.
+
+---
+
 ## Example Entry
 
 ```text
