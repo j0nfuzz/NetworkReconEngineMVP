@@ -188,3 +188,24 @@ Date:
 
 Phase:
 PHASE-003-VendorCommandProfiles
+
+---
+
+Decision ID: DD-004
+
+Decision:
+Bootstrap must discover Python via `py` launcher or PATH `python` only (no hard-coded interpreter paths), and must validate venv health (pyvenv.cfg interpreter existence and ability to execute) before reuse, recreating the venv on failure.
+
+Reason:
+Copied or synced .venv directories retain machine-specific interpreter references; folder-existence checks alone cause silent bootstrap failure on other workstations.
+
+Status:
+Proposed
+
+Approver:
+
+Date:
+2026-08-05
+
+Phase:
+PHASE-016-BootstrapEnvironmentPortability

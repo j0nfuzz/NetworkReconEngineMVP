@@ -582,3 +582,254 @@ Return:
 In other words:
 
 "Stop manually SSH'ing into fifty bloody devices."
+
+---
+
+## Phase 16 - Deployment Portability & Bootstrap Hardening
+
+The platform can now discover, collect, analyse and package diagnostics.
+
+The next challenge is ensuring it runs reliably on a different workstation without manual repair.
+
+Real-world testing exposed assumptions around:
+
+- Python installation paths
+- Virtual environments
+- User profiles
+- Local workstation configuration
+
+Current behaviour may succeed on the development workstation but fail when copied to another engineer's machine.
+
+Desired outcome:
+
+Clone repository.
+
+Run bootstrapper.
+
+Collect diagnostics.
+
+No manual Python troubleshooting required.
+
+### Requirements
+
+Bootstrapper must:
+
+- Detect missing Python installations.
+- Detect stale virtual environments.
+- Detect broken interpreter references.
+- Recreate `.venv` automatically when required.
+- Recreate `.venv-legacy` automatically when required.
+- Use locally available Python installations.
+- Avoid user-specific hard-coded paths.
+
+Supported discovery methods:
+
+- `py`
+- `python`
+- PATH detection
+
+### Example
+
+Bad:
+
+No Python at:
+
+C:\Users\<USERNAME>\AppData\Local\Programs\Python\Python312\python.exe
+
+Good:
+
+Detected invalid virtual environment.
+
+Recreating .venv using:
+
+C:\Program Files\Python313\python.exe
+
+Virtual environment rebuilt successfully.
+
+### Error Handling
+
+Provide actionable messages.
+
+Example:
+
+Python not found.
+
+Install Python 3.12+ and ensure either:
+
+- py launcher is available
+- python is available in PATH
+
+The collector has not started.
+
+### Validation
+
+Test on:
+
+- Development workstation
+- Clean workstation
+- Different Windows user profile
+
+The collector must:
+
+- Build dependencies
+- Launch successfully
+- Execute collection
+
+without path modification.
+
+### Out of Scope
+
+- MSI packaging
+- EXE packaging
+- Docker
+- Auto updates
+- Central management
+- Credential vault integration
+
+### Benefits
+
+- Easier deployment
+- Easier onboarding
+- Fewer environment-specific failures
+- Greater confidence in field use
+
+### Design Principle
+
+A network engineer should not need to understand Python virtual environments in order to run the troubleshooting platform.
+
+---
+
+## Phase 17 - Documentation & Operational Guidance
+
+The platform is now functionally complete through:
+
+- Discovery
+- Topology Mapping
+- Traversal
+- Recursive Collection
+- Checkpointing
+- Resume
+- Data Normalisation
+- Health Scoring
+- Troubleshooting Bundle Generation
+- Deployment Portability
+
+The next challenge is usability.
+
+A new engineer should be able to:
+
+1. Clone the repository.
+2. Run the bootstrapper.
+3. Collect diagnostics.
+4. Understand the generated outputs.
+
+without requiring project history or tribal knowledge.
+
+### Desired Outcome
+
+Documentation accurately reflects the implemented platform.
+
+Engineers unfamiliar with the project can successfully:
+
+- Deploy the tool
+- Execute collection
+- Interpret outputs
+- Troubleshoot common failures
+
+using the supplied documentation alone.
+
+### Requirements
+
+Update project documentation to reflect current functionality.
+
+Review and refresh:
+
+- README.md
+- Deployment guidance
+- Bootstrap behaviour
+- Output structure
+- Collection workflow
+- Recovery and resume capability
+
+Create:
+
+- HOWTO-PORTABLE.md
+
+### README Coverage
+
+README should explain:
+
+- Purpose of the platform
+- Supported workflow
+- Quick-start usage
+- Bootstrap process
+- Discovery and collection behaviour
+- Output directory structure
+- Troubleshooting bundle contents
+- Resume and checkpoint functionality
+
+### HOWTO-PORTABLE.md Coverage
+
+Document:
+
+- Moving the repository between workstations
+- Python requirements
+- Bootstrap recovery behaviour
+- Automatic venv recreation
+- Common deployment issues
+- Validation steps after relocation
+
+Example:
+
+Clone repository.
+
+Run bootstrapper.
+
+Bootstrap validates Python installation.
+
+Bootstrap validates virtual environments.
+
+Stale environments are rebuilt automatically.
+
+Collection begins.
+
+### Documentation Principles
+
+Documentation must:
+
+- Reflect implemented behaviour only
+- Avoid aspirational future functionality
+- Assume limited Python knowledge
+- Use practical examples
+- Be written for network engineers rather than developers
+
+### Validation
+
+A new engineer should be able to:
+
+- Set up the platform
+- Run a collection
+- Locate output artefacts
+- Understand generated reports
+
+without verbal assistance.
+
+### Out Of Scope
+
+- Architecture changes
+- New functionality
+- Packaging systems
+- Installer creation
+- Video walkthroughs
+- Wiki migration
+
+### Benefits
+
+- Faster onboarding
+- Reduced support overhead
+- Better deployment consistency
+- Lower operational risk
+
+### Design Principle
+
+A troubleshooting platform is not complete until someone who did not build it can successfully use it.

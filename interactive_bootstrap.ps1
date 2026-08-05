@@ -55,11 +55,89 @@ function ConvertTo-YamlStr {
     return "'" + ($Value -replace "'", "''") + "'"
 }
 
+function Find-PythonInterpreter {
+    # Prefer the Windows `py` launcher, then fall back to PATH `python`.
+    $candidates = @('py', 'python')
+    foreach ($candidate in $candidates) {
+        $found = Get-Command $candidate -ErrorAction SilentlyContinue
+        if ($found) {
+            try {
+                # Resolve the full path and major/minor version of the candidate
+                # interpreter. Trim captured stdout so we always return a single string.
+                $info = (& $candidate -c "import sys; print(sys.executable); print(sys.version_info.major); print(sys.version_info.minor)" 2>$null)
+                if ($info -is [array]) { $info = $info | ForEach-Object { $_.Trim() } }
+                else { $info = $info.Trim() -split "`r?`n" }
+                if ($info.Count -lt 3) { continue }
+                $path = [string]$info[0]
+                $major = [int]$info[1]
+                $minor = [int]$info[2]
+                if (-not [string]::IsNullOrWhiteSpace($path)) { $path = $path.Trim() }
+                if (($major -gt 3 -or ($major -eq 3 -and $minor -ge 12)) -and (Test-Path $path)) {
+                    Write-Verbose "Found Python interpreter via '$candidate': $path"
+                    return $path
+                }
+            }
+            catch {
+                Write-Verbose "Candidate '$candidate' failed discovery; trying next."
+            }
+        }
+    }
+    return $null
+}
+
+function Test-VenvHealthy {
+    param([string]$VenvDir)
+    $pyvenvPath = Join-Path $VenvDir 'pyvenv.cfg'
+    if (-not (Test-Path $pyvenvPath)) { return $false }
+
+    # Verify the base interpreter referenced in pyvenv.cfg exists. A copied venv
+    # may retain a machine-specific home path while still containing python.exe.
+    $homeInterpreter = $null
+    foreach ($line in Get-Content -LiteralPath $pyvenvPath) {
+        if ($line -match '^home\s*=\s*(.+)$') {
+            $homeInterpreter = $matches[1].Trim()
+            break
+        }
+    }
+    if (-not $homeInterpreter) { return $false }
+    if (-not (Test-Path $homeInterpreter)) { return $false }
+
+    $exePath = Join-Path $VenvDir 'Scripts\python.exe'
+    if (-not (Test-Path $exePath)) { return $false }
+
+    $null = & $exePath -c "import sys; sys.exit(0)" 2>$null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Remove-Venv {
+    param([string]$VenvDir)
+    if (Test-Path $VenvDir) {
+        Write-Host "Removing stale virtual environment '$VenvDir' ..."
+        Remove-Item -LiteralPath $VenvDir -Recurse -Force
+    }
+}
+
 function Ensure-Venv {
     param([string]$VenvDir, [string]$RequirementsFile)
+    if ((Test-Path $VenvDir) -and (-not (Test-VenvHealthy -VenvDir $VenvDir))) {
+        Remove-Venv -VenvDir $VenvDir
+    }
     if (-not (Test-Path $VenvDir)) {
-        Write-Host "Creating virtual environment '$VenvDir' ..."
-        python -m venv $VenvDir
+        $interpreter = Find-PythonInterpreter
+        if (-not $interpreter) {
+            throw @"
+Python not found.
+Install Python 3.12+ and ensure either:
+- the `py` launcher is available
+- `python` is available in PATH
+The collector has not started.
+"@
+        }
+        Write-Host "Creating virtual environment '$VenvDir' using $interpreter ..."
+        & $interpreter -m venv $VenvDir
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to create virtual environment '$VenvDir' using '$interpreter'."
+        }
     }
     if (-not $SkipInstall) {
         Write-Host "Installing dependencies ($RequirementsFile) into '$VenvDir' ..."

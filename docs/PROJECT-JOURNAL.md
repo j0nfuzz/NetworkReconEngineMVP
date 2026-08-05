@@ -1263,3 +1263,58 @@ Risks Resolved:
 
 Next Recommended Action:
 - Select the next phase from the project roadmap.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-016-BootstrapEnvironmentPortability
+
+Changes:
+- Added Python interpreter discovery (`py` launcher first, PATH `python` second) to interactive_bootstrap.ps1.
+- Added venv health validation (pyvenv.cfg presence, interpreter existence, executable can run) before reuse.
+- Added automatic stale-venv removal and recreation when validation fails.
+- Added clean, actionable error message and exit when no usable Python is found.
+- Added Pester tests in tests/test_bootstrap.ps1 covering discovery, healthy/stale venv detection, venv reuse, and venv recreation.
+
+Reason:
+- Real-world deployment on a different Windows user profile failed at bootstrap because .venv contained a stale pyvenv.cfg reference to the original developer's profile path; collection never started. This remediation makes bootstrap deterministic across workstations without changing application code.
+
+Risks Introduced:
+- Venv recreation adds a small time penalty when a stale environment is detected.
+- Reliance on `py` launcher or PATH `python` may still fail on locked-down workstations where neither is exposed.
+
+Risks Resolved:
+- Stale .venv/.venv-legacy references no longer silently break bootstrap.
+- Hard-coded or profile-specific interpreter assumptions are removed from the bootstrap path.
+- Missing Python now fails before any SSH/collection attempt with an actionable message.
+
+Next Recommended Action:
+- Review PHASE-016 implementation and propose/approve DD-004.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-016A-BootstrapEnvironmentPortabilityRemediation
+
+Changes:
+- Hardened Test-VenvHealthy to validate the `home` interpreter path referenced by pyvenv.cfg and to require a zero exit code from the venv python.
+- Corrected the stale-pyvenv.cfg test so it no longer removes or renames python.exe; failure now proves stale interpreter-reference detection.
+- Added tests for py launcher precedence, PATH python fallback, no usable Python 3.12+ failure path, and non-zero venv python execution.
+
+Reason:
+- GPT Reviewer (2026-08-05) found PHASE-016's Test-VenvHealthy only checked file existence and did not verify the pyvenv.cfg interpreter reference or exit code, leaving the original portability failure mode undetected.
+
+Risks Introduced:
+- None beyond the existing PoC risk that venv recreation takes time on slow machines.
+
+Risks Resolved:
+- Stale `pyvenv.cfg` home interpreter references are detected even when `Scripts\python.exe` is still present.
+- Non-zero exit codes from the venv Python are treated as unhealthy.
+- Discovery and failure paths are now covered by focused tests.
+
+Next Recommended Action:
+- Re-review PHASE-016A and approve DD-004.
