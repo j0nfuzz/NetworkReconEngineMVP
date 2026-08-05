@@ -582,6 +582,219 @@ Next Recommended Action:
 
 ---
 
+Date: 2026-08-05
+Agent: Claude
+
+Phase: PHASE-010-Checkpointing
+
+Changes:
+- Selected Checkpointing as next implementation phase (Wishlist Phase 10), overriding reviewer's ParallelCollection suggestion.
+
+Reason:
+- Wishlist Phase 9 (Parallel Collection) explicitly targets asyncssh, a new dependency that conflicts with the standing "no new dependencies" constraint. Checkpointing needs only the built-in json module already used across the project, directly satisfies PROJECT-STANDARD's mandatory resume-capability principle, and reuses the state already produced by run_recursive_collection() (PHASE-009A).
+
+Risks Introduced:
+- None (selection only).
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-010-Checkpointing.md.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-010-Checkpointing
+
+Changes:
+- Added app/checkpoint.py with save_checkpoint(), load_checkpoint(), state_to_checkpoint(), and CheckpointError.
+- Added optional on_collected callback to run_recursive_collection() so callers can save state after each successful collection without changing default behavior.
+- Added tests/test_checkpoint.py covering round-trip persistence, missing file, corrupt JSON, plain JSON output, sorted pending, callback integration, and resume semantics.
+
+Reason:
+- Implements Wishlist Phase 10 (checkpointing) with the built-in json module, reuses existing recursive-collection state, and satisfies PROJECT-STANDARD's resume-capability principle without concurrency or new dependencies.
+
+Risks Introduced:
+- Plaintext JSON checkpoint files contain device names/IPs; no credentials are persisted.
+- Concurrent checkpoint writes are not addressed.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Review PHASE-010-Checkpointing.
+
+---
+
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-010-Checkpointing
+
+Changes:
+- Reviewed checkpoint persistence and recovery integration.
+
+Reason:
+- save/load JSON works, but loaded state cannot drive the orchestrator and callback state omits newly queued neighbors.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement CheckpointingRemediation.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-010A-CheckpointingRemediation
+
+Changes:
+- Added resume_state parameter to run_recursive_collection() so it can initialize visited/pending/successful/failed/unsupported from a loaded checkpoint.
+- Added _reconstruct_pending_devices() to rebuild pending Device objects from checkpoint names.
+- Moved on_collected callback to fire after neighbor classification and enqueue processing, ensuring persisted pending state includes newly discovered devices.
+- Added/updated tests/test_checkpoint.py to prove resume skips visited devices, collects pending devices, and callback state includes newly queued neighbors.
+
+Reason:
+- Resolves the two accepted review findings in PHASE-010 with minimal additive changes, preserving existing checkpoint JSON format and default behavior.
+
+Risks Introduced:
+- Pending device reconstruction may lack hostname when neighbor records are unavailable (accepted PoC limitation).
+
+Risks Resolved:
+- Checkpoint state could not previously resume collection.
+- Checkpoint callback previously omitted newly discovered pending devices.
+
+Next Recommended Action:
+- Re-review PHASE-010A-CheckpointingRemediation.
+
+---
+
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-010A-CheckpointingRemediation
+
+Changes:
+- Reviewed resume-state consumption and checkpoint timing.
+
+Reason:
+- Successful collection checkpoints include queued neighbors, but failed collection paths bypass checkpoint persistence.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement CheckpointFailurePersistenceRemediation.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-010B-CheckpointFailurePersistenceRemediation
+
+Changes:
+- Extracted a shared _emit_checkpoint() helper in run_recursive_collection() and invoked it both on failed collection and after successful discovery/enqueue processing.
+- Added tests/test_checkpoint.py tests proving failed collections are checkpointed, failed state survives save/load, and resume preserves previously failed devices.
+
+Reason:
+- Resolves the accepted review finding that failed collections bypassed checkpoint persistence, causing restart to lose failure state.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Failed collection state is now persisted.
+- Resume preserves previously failed devices.
+
+Next Recommended Action:
+- Re-review PHASE-010B-CheckpointFailurePersistenceRemediation.
+
+---
+
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-010B-CheckpointFailurePersistenceRemediation
+
+Changes:
+- Reviewed failed-collection checkpoint emission and resumed failure state.
+
+Reason:
+- Failed collections now emit checkpoints before continuing; focused tests confirm failed state survives save/load and successful-path checkpoint timing remains intact.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Failed collection state was not persisted before restart.
+
+Next Recommended Action:
+- Select ParallelCollection.
+
+---
+
+Date: 2026-08-05
+Agent: Claude
+
+Phase: PHASE-011-CLIRecursiveCollectionIntegration
+
+Changes:
+- Selected CLI Recursive Collection Integration as next implementation phase, overriding reviewer's ParallelCollection suggestion.
+
+Reason:
+- app/cli.py still runs only the original flat per-device loop and never calls run_recursive_collection() or the checkpoint module; nine phases of recursive-collection and resume work (PHASE-009 through PHASE-010B) are currently unreachable from the actual CLI entry point. Wiring them in is the smallest change that proves the full pipeline end-to-end and is a prerequisite for any future parallel-collection work operating on the same entry point.
+
+Risks Introduced:
+- None (selection only).
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-011-CLIRecursiveCollectionIntegration.md.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-011-CLIRecursiveCollectionIntegration
+
+Changes:
+- Added `--recursive` and `--checkpoint-file` CLI flags to `app/cli.py`.
+- Composed existing `run_recursive_collection()`, `save_checkpoint()`, and `load_checkpoint()` in a new `_run_recursive_cli()` helper.
+- Recursive mode uses the first configured device as seed and preserves existing `bundle_manifest.json`/`topology.json` output.
+- Non-recursive CLI behaviour is unchanged.
+- Added 7 regression tests covering recursive execution, checkpoint creation/resume, bundle output, non-recursive path, and missing checkpoint handling.
+
+Reason:
+- Acceptance criteria required the recursive collection and checkpoint resume pipeline to be reachable from the CLI entry point.
+
+Risks Introduced:
+- Default credentials inferred from seed device fields after config merge; raw `default` block not exposed by `load_devices()`.
+- Single-seed recursion only; multi-seed remains out of scope.
+- Plaintext credential/checkpoint persistence remains a PoC limitation.
+
+Risks Resolved:
+- Recursive collection and checkpoint resume were unreachable from the CLI.
+
+Next Recommended Action:
+- Review PHASE-011 and decide whether to propose a DDR entry for default-credential inference.
+
+---
+
 ## Example Entry
 
 ```text
@@ -627,3 +840,28 @@ Avoid:
 - Long narratives
 - Repeated context
 - Restating prior decisions
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-011A-CLIRecursiveCollectionRemediation
+
+Changes:
+- Added load_default_credentials() to app/config.py to read the raw config default block.
+- Updated _run_recursive_cli() in app/cli.py to source recursive defaults from load_default_credentials() instead of seed-device overrides.
+- Gated recursive --dry-run so it only validates the seed device with execute_device_collection(..., dry_run=True) and does not invoke run_recursive_collection().
+- Updated existing recursive tests and added 4 new regression tests for dry-run safety and default-credential sourcing.
+
+Reason:
+- Reviewer found recursive --dry-run could perform real collection and discovered neighbors inherited seed-specific credential overrides.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Recursive --dry-run no longer triggers real recursive collection.
+- Recursive defaults now come from the config default block.
+
+Next Recommended Action:
+- Re-review PHASE-011/011A.

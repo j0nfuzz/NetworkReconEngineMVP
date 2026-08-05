@@ -30,3 +30,6 @@ output/
 live_output/
 demo_output/
 config/interactive_devices.yml
+
+# LLM context packs / checkpoints
+context_packs/

@@ -6,7 +6,7 @@ from pathlib import Path
 import paramiko
 
 import app.collector as collector_module
-from app.cli import parse_args, probe_devices, _is_legacy_error
+from app.cli import parse_args, probe_devices, _is_legacy_error, _run_recursive_cli
 from app.collector import execute_device_collection, write_bundle
 from app.classification import classify_neighbor_support, classify_neighbors
 from app.detector import detect_vendor_from_show_version
@@ -29,6 +29,22 @@ def test_parse_args_supports_verbose_flag(monkeypatch):
     ])
     args = parse_args()
     assert args.verbose is True
+
+
+def test_parse_args_supports_recursive_and_checkpoint_file(monkeypatch):
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        "output",
+        "--recursive",
+        "--checkpoint-file",
+        "checkpoint.json",
+    ])
+    args = parse_args()
+    assert args.recursive is True
+    assert args.checkpoint_file == "checkpoint.json"
 
 
 def test_vendor_profile_cisco():
@@ -541,4 +557,519 @@ def test_traverse_topology_missing_start_is_failed():
     assert result["failed"] == ["MISSING"]
     assert result["visited"] == []
     assert result["pending"] == ["A"]
+
+
+def test_recursive_cli_invokes_orchestrator(monkeypatch, tmp_path):
+    """Recursive mode calls run_recursive_collection with the first device as seed."""
+    config_path = tmp_path / "devices.yml"
+    config_path.write_text(
+        "default:\n"
+        "  username: admin\n"
+        "  password: <PASSWORD-01>\n"
+        "  enable_password: <PASSWORD-02>\n"
+        "devices:\n"
+        "  - name: seed-sw\n"
+        "    hostname: 10.0.0.1\n"
+        "    vendor: cisco\n"
+    , encoding="utf-8")
+
+    captured = {}
+
+    def fake_run_recursive_collection(
+        seed_device,
+        default_credentials=None,
+        *,
+        max_devices=100,
+        on_collected=None,
+        resume_state=None,
+    ):
+        captured["seed"] = seed_device
+        captured["default_credentials"] = default_credentials
+        captured["resume_state"] = resume_state
+        captured["on_collected"] = on_collected
+        bundle = DeviceBundle(
+            device_name=seed_device.name,
+            device_vendor=seed_device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+        return {
+            "successful": [seed_device.name],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {seed_device.name: bundle},
+        }
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        str(config_path),
+        "--output-dir",
+        str(tmp_path),
+        "--recursive",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert captured["seed"].name == "seed-sw"
+    assert captured["seed"].vendor == "cisco"
+    assert captured["default_credentials"] == {
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+        "enable_password": "<PASSWORD-02>",
+    }
+    assert captured["resume_state"] is None
+
+
+def test_recursive_cli_creates_checkpoint_file(monkeypatch, tmp_path):
+    """Recursive mode with --checkpoint-file persists state via save_checkpoint."""
+    device_dict = {
+        "name": "seed-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+        "enable_password": "<PASSWORD-02>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    def fake_run_recursive_collection(
+        seed_device,
+        default_credentials=None,
+        *,
+        max_devices=100,
+        on_collected=None,
+        resume_state=None,
+    ):
+        # Simulate orchestrator emitting a checkpoint.
+        if callable(on_collected):
+            on_collected({
+                "visited": {seed_device.name},
+                "pending": [],
+                "successful": [seed_device.name],
+                "failed": [],
+                "unsupported": [],
+            })
+        bundle = DeviceBundle(
+            device_name=seed_device.name,
+            device_vendor=seed_device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+        return {
+            "successful": [seed_device.name],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {seed_device.name: bundle},
+        }
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+
+    checkpoint_path = tmp_path / "checkpoint.json"
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--recursive",
+        "--checkpoint-file",
+        str(checkpoint_path),
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert checkpoint_path.exists()
+    payload = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    assert "seed-sw" in payload["visited"]
+
+
+def test_recursive_cli_resumes_from_existing_checkpoint(monkeypatch, tmp_path):
+    """Recursive mode loads an existing checkpoint and passes it as resume_state."""
+    device_dict = {
+        "name": "seed-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+        "enable_password": "<PASSWORD-02>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    checkpoint_path = tmp_path / "checkpoint.json"
+    checkpoint_path.write_text(json.dumps({
+        "visited": ["seed-sw"],
+        "pending": ["neighbor-sw"],
+        "successful": ["seed-sw"],
+        "failed": [],
+        "unsupported": [],
+    }), encoding="utf-8")
+
+    captured = {}
+
+    def fake_run_recursive_collection(
+        seed_device,
+        default_credentials=None,
+        *,
+        max_devices=100,
+        on_collected=None,
+        resume_state=None,
+    ):
+        captured["resume_state"] = resume_state
+        bundle = DeviceBundle(
+            device_name=seed_device.name,
+            device_vendor=seed_device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+        return {
+            "successful": [seed_device.name],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {seed_device.name: bundle},
+        }
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--recursive",
+        "--checkpoint-file",
+        str(checkpoint_path),
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert captured["resume_state"] is not None
+    assert "seed-sw" in captured["resume_state"]["visited"]
+    assert captured["resume_state"]["pending"] == ["neighbor-sw"]
+
+
+def test_recursive_cli_writes_bundle_manifest(monkeypatch, tmp_path):
+    """Recursive mode still writes bundle_manifest.json and topology.json."""
+    device_dict = {
+        "name": "seed-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    def fake_run_recursive_collection(
+        seed_device,
+        default_credentials=None,
+        *,
+        max_devices=100,
+        on_collected=None,
+        resume_state=None,
+    ):
+        bundle = DeviceBundle(
+            device_name=seed_device.name,
+            device_vendor=seed_device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+        return {
+            "successful": [seed_device.name],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {seed_device.name: bundle},
+        }
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--recursive",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    manifest = tmp_path / "bundle_manifest.json"
+    assert manifest.exists()
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    assert payload["dry_run"] is False
+    assert payload["devices"][0]["name"] == "seed-sw"
+    assert (tmp_path / "topology.json").exists()
+
+
+def test_non_recursive_path_unchanged(monkeypatch, tmp_path):
+    """Without --recursive the CLI still iterates devices and writes the manifest."""
+    device_dict = {
+        "name": "flat-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    captured = {}
+
+    def fake_execute(device, dry_run=False):
+        captured["device"] = device
+        captured["dry_run"] = dry_run
+        return DeviceBundle(
+            device_name=device.name,
+            device_vendor=device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+
+    monkeypatch.setattr("app.cli.execute_device_collection", fake_execute)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--dry-run",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert captured["device"].name == "flat-sw"
+    assert captured["dry_run"] is True
+    manifest = json.loads((tmp_path / "bundle_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["devices"][0]["name"] == "flat-sw"
+
+
+def test_missing_checkpoint_file_is_handled(monkeypatch, tmp_path):
+    """A non-existent checkpoint file is treated as no resume state."""
+    device_dict = {
+        "name": "seed-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    captured = {}
+
+    def fake_run_recursive_collection(
+        seed_device,
+        default_credentials=None,
+        *,
+        max_devices=100,
+        on_collected=None,
+        resume_state=None,
+    ):
+        captured["resume_state"] = resume_state
+        bundle = DeviceBundle(
+            device_name=seed_device.name,
+            device_vendor=seed_device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+        return {
+            "successful": [seed_device.name],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {seed_device.name: bundle},
+        }
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--recursive",
+        "--checkpoint-file",
+        str(tmp_path / "missing.json"),
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert captured["resume_state"] is None
+
+
+def test_recursive_cli_dry_run_does_not_invoke_orchestrator(monkeypatch, tmp_path):
+    """Recursive --dry-run must not call run_recursive_collection or real collection."""
+    device_dict = {
+        "name": "seed-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    called = {"orchestrator": False, "execute": False}
+
+    def fake_run_recursive_collection(*args, **kwargs):
+        called["orchestrator"] = True
+        return {}
+
+    def fake_execute(device, dry_run=False):
+        called["execute"] = True
+        return DeviceBundle(
+            device_name=device.name,
+            device_vendor=device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+    monkeypatch.setattr("app.cli.execute_device_collection", fake_execute)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--dry-run",
+        "--recursive",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert called["orchestrator"] is False
+    assert called["execute"] is True
+
+    manifest = json.loads((tmp_path / "bundle_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["dry_run"] is True
+    assert manifest["devices"][0]["status"] == "dry-run-success"
+
+
+def test_recursive_cli_uses_config_default_block_for_credentials(monkeypatch, tmp_path):
+    """Default credentials for recursive neighbors come from the config default block, not seed overrides."""
+    from app.config import load_default_credentials
+
+    config_path = tmp_path / "devices.yml"
+    config_path.write_text(
+        "default:\n"
+        "  username: global-user\n"
+        "  password: <PASSWORD-03>\n"
+        "  enable_password: <PASSWORD-04>\n"
+        "devices:\n"
+        "  - name: seed-sw\n"
+        "    hostname: 10.0.0.1\n"
+        "    vendor: cisco\n"
+        "    username: seed-user\n"
+        "    password: <PASSWORD-12>\n"
+    , encoding="utf-8")
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        str(config_path),
+        "--output-dir",
+        str(tmp_path),
+        "--recursive",
+    ])
+
+    captured = {}
+
+    def fake_run_recursive_collection(
+        seed_device,
+        default_credentials=None,
+        *,
+        max_devices=100,
+        on_collected=None,
+        resume_state=None,
+    ):
+        captured["default_credentials"] = default_credentials
+        bundle = DeviceBundle(
+            device_name=seed_device.name,
+            device_vendor=seed_device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+        return {
+            "successful": [seed_device.name],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {seed_device.name: bundle},
+        }
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+
+    from app.cli import main
+
+    assert main() == 0
+    assert captured["default_credentials"] == {
+        "username": "global-user",
+        "password": "<PASSWORD-03>",
+        "enable_password": "<PASSWORD-04>",
+    }
+
+
+def test_load_default_credentials_reads_raw_config_block(tmp_path):
+    from app.config import load_default_credentials
+
+    config_path = tmp_path / "devices.yml"
+    config_path.write_text(
+        "default:\n"
+        "  username: a\n"
+        "  password: <PASSWORD-05>\n"
+        "devices:\n"
+        "  - name: d\n"
+    , encoding="utf-8")
+
+    assert load_default_credentials(config_path) == {"username": "a", "password": "<PASSWORD-05>"}
+
+
+def test_load_default_credentials_returns_empty_when_no_default(tmp_path):
+    from app.config import load_default_credentials
+
+    config_path = tmp_path / "devices.yml"
+    config_path.write_text(
+        "devices:\n"
+        "  - name: d\n"
+    , encoding="utf-8")
+
+    assert load_default_credentials(config_path) == {}
 

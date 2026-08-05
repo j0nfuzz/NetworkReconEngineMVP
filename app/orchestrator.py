@@ -3,9 +3,36 @@ from __future__ import annotations
 from collections import deque
 from typing import Any, Dict, List, Optional
 
+from app.checkpoint import state_to_checkpoint
 from app.classification import classify_neighbors
 from app.collector import execute_device_collection
 from app.models import Device, DeviceBundle
+
+
+def _reconstruct_pending_devices(
+    pending_names: List[str],
+    discovered: List[Dict[str, str]],
+    defaults: Dict[str, Any],
+) -> List[Device]:
+    """Rebuild pending devices from names, using neighbor records for hostname when possible."""
+    name_to_ip = {
+        record.get("neighbor", ""): record.get("ip", "")
+        for record in discovered or []
+        if record.get("neighbor")
+    }
+    devices: List[Device] = []
+    for name in pending_names:
+        devices.append(
+            Device(
+                name=name,
+                hostname=name_to_ip.get(name, ""),
+                vendor="unknown",
+                username=defaults.get("username", ""),
+                password=defaults.get("password", ""),
+                enable_password=defaults.get("enable_password"),
+            )
+        )
+    return devices
 
 
 def run_recursive_collection(
@@ -13,16 +40,27 @@ def run_recursive_collection(
     default_credentials: Optional[Dict[str, Any]] = None,
     *,
     max_devices: int = 100,
+    on_collected: Any = None,
+    resume_state: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Collect from a seed device, then recursively collect from supported neighbors."""
     defaults = default_credentials or {}
-    visited: set[str] = set()
-    queued: set[str] = {seed_device.name}
-    successful: List[str] = []
-    failed: List[str] = []
-    unsupported: List[str] = []
+    resume = resume_state or {}
+    visited: set[str] = set(resume.get("visited", []))
+    queued: set[str] = set(resume.get("pending", []))
+    successful: List[str] = list(resume.get("successful", []))
+    failed: List[str] = list(resume.get("failed", []))
+    unsupported: List[str] = list(resume.get("unsupported", []))
     bundles: Dict[str, DeviceBundle] = {}
-    queue: deque[Device] = deque([seed_device])
+
+    pending_devices = _reconstruct_pending_devices(
+        list(resume.get("pending", [])), [], defaults
+    )
+    queue: deque[Device] = deque(pending_devices)
+    if seed_device.name not in visited:
+        queue.append(seed_device)
+    for device in queue:
+        queued.add(device.name)
 
     while queue and len(visited) < max_devices:
         device = queue.popleft()
@@ -34,11 +72,24 @@ def run_recursive_collection(
         bundle = execute_device_collection(device)
         bundles[device.name] = bundle
 
+        def _emit_checkpoint() -> None:
+            if callable(on_collected):
+                on_collected(
+                    state_to_checkpoint(
+                        visited=visited,
+                        queued=queued,
+                        successful=successful,
+                        failed=failed,
+                        unsupported=unsupported,
+                    )
+                )
+
         status = bundle.summary.get("status")
         if status in ("collected", "dry-run-success", "partial"):
             successful.append(device.name)
         else:
             failed.append(device.name)
+            _emit_checkpoint()
             continue
 
         discovered = bundle.summary.get("discovered_neighbors", [])
@@ -72,6 +123,8 @@ def run_recursive_collection(
                     enable_password=defaults.get("enable_password"),
                 )
             )
+
+        _emit_checkpoint()
 
     return {
         "successful": successful,
