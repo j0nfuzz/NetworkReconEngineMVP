@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 
 import paramiko
@@ -1072,4 +1073,349 @@ def test_load_default_credentials_returns_empty_when_no_default(tmp_path):
     , encoding="utf-8")
 
     assert load_default_credentials(config_path) == {}
+
+
+def test_non_recursive_cli_writes_analysis_artifacts(monkeypatch, tmp_path):
+    """Non-recursive collections generate merged summary.json and troubleshooting_bundle.json."""
+    device_dict = {
+        "name": "flat-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    bundle = DeviceBundle(
+        device_name="flat-sw",
+        device_vendor="cisco",
+        timestamp="2026-08-04T00:00:00Z",
+        summary={
+            "device": "flat-sw",
+            "hostname": "10.0.0.1",
+            "vendor": "cisco",
+            "status": "collected",
+            "commands_run": 1,
+            "failed_commands": [],
+        },
+        raw_outputs={"show version": "Cisco IOS XE Software, Version 17.09.04"},
+        failed_commands=[],
+    )
+    monkeypatch.setattr("app.cli.execute_device_collection", lambda device, dry_run=False: bundle)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+
+    device_dir = tmp_path / "flat-sw"
+    summary_path = device_dir / "summary.json"
+    troubleshooting_path = device_dir / "troubleshooting_bundle.json"
+    assert summary_path.exists()
+    assert troubleshooting_path.exists()
+
+    summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    troubleshooting_payload = json.loads(troubleshooting_path.read_text(encoding="utf-8"))
+
+    # Raw collector fields are preserved.
+    assert summary_payload["device"] == "flat-sw"
+    assert summary_payload["hostname"] == "10.0.0.1"
+    assert summary_payload["vendor"] == "cisco"
+    assert summary_payload["status"] == "collected"
+    assert summary_payload["commands_run"] == 1
+    # Health fields are merged in.
+    assert "health_score" in summary_payload
+    assert "warnings" in summary_payload
+    assert "critical" in summary_payload
+
+    assert troubleshooting_payload["hostname"] == "10.0.0.1"
+    assert troubleshooting_payload["health_score"] == summary_payload["health_score"]
+    assert "briefing" in troubleshooting_payload
+
+
+def test_non_recursive_dry_run_does_not_write_analysis_artifacts(monkeypatch, tmp_path):
+    """Dry-run mode does not generate analysis artifacts."""
+    device_dict = {
+        "name": "flat-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+    monkeypatch.setattr("app.cli.execute_device_collection", lambda device, dry_run=False: DeviceBundle(
+        device_name=device.name,
+        device_vendor=device.vendor,
+        timestamp="2026-08-04T00:00:00Z",
+        summary={
+            "device": device.name,
+            "hostname": "10.0.0.1",
+            "vendor": "cisco",
+            "status": "dry-run-success",
+            "commands_run": 0,
+            "failed_commands": [],
+        },
+        raw_outputs={},
+        failed_commands=[],
+    ))
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--dry-run",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+
+    device_dir = tmp_path / "flat-sw"
+    summary_path = device_dir / "summary.json"
+    assert summary_path.exists()
+    # Raw summary is preserved; health/analysis fields must be absent.
+    summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert summary_payload["status"] == "dry-run-success"
+    assert "health_score" not in summary_payload
+    assert not (device_dir / "troubleshooting_bundle.json").exists()
+
+    # ZIP should not contain analysis artifacts in dry-run.
+    with zipfile.ZipFile(device_dir.with_suffix(".zip"), "r") as zf:
+        assert "troubleshooting_bundle.json" not in zf.namelist()
+        raw_summary = json.loads(zf.read("summary.json"))
+        assert raw_summary["status"] == "dry-run-success"
+        assert "health_score" not in raw_summary
+
+
+def test_recursive_cli_writes_analysis_artifacts(monkeypatch, tmp_path):
+    """Recursive collections generate analysis artifacts per collected device."""
+    device_dict = {
+        "name": "seed-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    def fake_run_recursive_collection(
+        seed_device,
+        default_credentials=None,
+        *,
+        max_devices=100,
+        on_collected=None,
+        resume_state=None,
+    ):
+        bundles = {}
+        for name in ("seed-sw", "neighbor-sw"):
+            bundles[name] = DeviceBundle(
+                device_name=name,
+                device_vendor="cisco",
+                timestamp="2026-08-04T00:00:00Z",
+                summary={
+                    "device": name,
+                    "hostname": f"10.0.0.{len(bundles) + 1}",
+                    "vendor": "cisco",
+                    "status": "collected",
+                    "commands_run": 1,
+                    "failed_commands": [],
+                },
+                raw_outputs={"show version": "Cisco IOS XE Software, Version 17.09.04"},
+                failed_commands=[],
+            )
+        return {
+            "successful": list(bundles.keys()),
+            "failed": [],
+            "unsupported": [],
+            "bundles": bundles,
+        }
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--recursive",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+
+    for name in ("seed-sw", "neighbor-sw"):
+        device_dir = tmp_path / name
+        assert (device_dir / "summary.json").exists()
+        assert (device_dir / "troubleshooting_bundle.json").exists()
+
+        summary_payload = json.loads((device_dir / "summary.json").read_text(encoding="utf-8"))
+        assert summary_payload["device"] == name
+        assert "health_score" in summary_payload
+
+        # Analysis artifacts are packaged into the ZIP.
+        with zipfile.ZipFile(device_dir.with_suffix(".zip"), "r") as zf:
+            assert "summary.json" in zf.namelist()
+            assert "troubleshooting_bundle.json" in zf.namelist()
+            archived_summary = json.loads(zf.read("summary.json"))
+            assert archived_summary["device"] == name
+            assert "health_score" in archived_summary
+
+
+def test_analysis_pipeline_preserves_existing_outputs(monkeypatch, tmp_path):
+    """Existing bundle_manifest.json and topology.json shapes are unchanged."""
+    device_dict = {
+        "name": "flat-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    bundle = DeviceBundle(
+        device_name="flat-sw",
+        device_vendor="cisco",
+        timestamp="2026-08-04T00:00:00Z",
+        summary={
+            "device": "flat-sw",
+            "hostname": "10.0.0.1",
+            "vendor": "cisco",
+            "role": "switch",
+            "discovered_neighbors": [{"neighbor": "sw02", "source": "show cdp neighbors detail"}],
+            "status": "collected",
+            "commands_run": 1,
+            "failed_commands": [],
+        },
+        raw_outputs={"show version": "Cisco IOS XE Software, Version 17.09.04"},
+        failed_commands=[],
+    )
+    monkeypatch.setattr("app.cli.execute_device_collection", lambda device, dry_run=False: bundle)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+
+    manifest = json.loads((tmp_path / "bundle_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["dry_run"] is False
+    assert manifest["devices"][0]["name"] == "flat-sw"
+    assert manifest["devices"][0]["vendor"] == "cisco"
+    assert manifest["devices"][0]["status"] == "collected"
+    assert "bundle_path" in manifest["devices"][0]
+
+    topology = json.loads((tmp_path / "topology.json").read_text(encoding="utf-8"))
+    assert "flat-sw" in topology["nodes"]
+    assert any(edge["source"] == "flat-sw" for edge in topology["edges"])
+
+
+def test_non_recursive_cli_packages_analysis_artifacts_in_zip(monkeypatch, tmp_path):
+    """Non-recursive collections include summary.json and troubleshooting_bundle.json in the ZIP."""
+    device_dict = {
+        "name": "flat-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    bundle = DeviceBundle(
+        device_name="flat-sw",
+        device_vendor="cisco",
+        timestamp="2026-08-04T00:00:00Z",
+        summary={
+            "device": "flat-sw",
+            "hostname": "10.0.0.1",
+            "vendor": "cisco",
+            "status": "collected",
+            "commands_run": 1,
+            "failed_commands": [],
+        },
+        raw_outputs={"show version": "Cisco IOS XE Software, Version 17.09.04"},
+        failed_commands=[],
+    )
+    monkeypatch.setattr("app.cli.execute_device_collection", lambda device, dry_run=False: bundle)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+
+    device_dir = tmp_path / "flat-sw"
+    archive_path = device_dir.with_suffix(".zip")
+    assert archive_path.exists()
+
+    with zipfile.ZipFile(archive_path, "r") as zf:
+        assert "summary.json" in zf.namelist()
+        assert "troubleshooting_bundle.json" in zf.namelist()
+        archived_summary = json.loads(zf.read("summary.json"))
+        assert archived_summary["device"] == "flat-sw"
+        assert "health_score" in archived_summary
+
+
+def test_analysis_pipeline_order_is_deterministic(monkeypatch, tmp_path):
+    """write_bundle executes summary → health → troubleshooting bundle in order."""
+    bundle = DeviceBundle(
+        device_name="flat-sw",
+        device_vendor="cisco",
+        timestamp="2026-08-04T00:00:00Z",
+        summary={"device": "flat-sw", "hostname": "10.0.0.1", "vendor": "cisco", "status": "collected"},
+        raw_outputs={"show version": "Cisco IOS XE Software, Version 17.09.04"},
+        failed_commands=[],
+    )
+
+    calls = []
+
+    def fake_build_device_summary(bundle):
+        calls.append("summary")
+        return {"hostname": bundle.device_name}
+
+    def fake_score_device_health(summary):
+        calls.append("health")
+        return {"score": 100, "warnings": [], "critical": []}
+
+    def fake_build_troubleshooting_bundle(summary, health, raw_outputs):
+        calls.append("troubleshooting")
+        return {"briefing": "ok"}
+
+    monkeypatch.setattr("app.collector.build_device_summary", fake_build_device_summary)
+    monkeypatch.setattr("app.collector.score_device_health", fake_score_device_health)
+    monkeypatch.setattr("app.collector.build_troubleshooting_bundle", fake_build_troubleshooting_bundle)
+
+    from app.collector import write_bundle
+
+    device_dir = write_bundle(bundle, tmp_path)
+    assert calls == ["summary", "health", "troubleshooting"]
+    assert (device_dir / "summary.json").exists()
+    assert (device_dir / "troubleshooting_bundle.json").exists()
 

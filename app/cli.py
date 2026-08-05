@@ -42,10 +42,11 @@ def _run_recursive_cli(
     if dry_run:
         log_verbose("[verbose] Recursive dry-run: skipping real collection")
         bundle = execute_device_collection(seed_device, dry_run=True)
+        device_dir = write_bundle(bundle, output_root)
         bundle_summary["devices"].append({
             "name": seed_device.name,
             "vendor": seed_device.vendor,
-            "bundle_path": str(write_bundle(bundle, output_root)),
+            "bundle_path": str(device_dir),
             "status": bundle.summary.get("status"),
             "summary": bundle.summary,
         })
@@ -68,11 +69,11 @@ def _run_recursive_cli(
 
     for name, bundle in result["bundles"].items():
         log_verbose(f"[verbose] Finished collection for {name}: {bundle.summary.get('status')}")
-        bundle_path = write_bundle(bundle, output_root)
+        device_dir = write_bundle(bundle, output_root)
         bundle_summary["devices"].append({
             "name": name,
             "vendor": bundle.device_vendor,
-            "bundle_path": str(bundle_path),
+            "bundle_path": str(device_dir),
             "status": bundle.summary.get("status"),
             "summary": bundle.summary,
         })
@@ -220,11 +221,11 @@ def main() -> int:
             bundle = execute_device_collection(device, dry_run=args.dry_run)
             if verbose:
                 print(f"[verbose] Finished collection for {device.name}: {bundle.summary.get('status')}")
-            bundle_path = write_bundle(bundle, output_root)
+            device_dir = write_bundle(bundle, output_root)
             bundle_summary["devices"].append({
                 "name": device.name,
                 "vendor": device.vendor,
-                "bundle_path": str(bundle_path),
+                "bundle_path": str(device_dir),
                 "status": bundle.summary.get("status"),
                 "summary": bundle.summary,
             })

@@ -8,8 +8,11 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from app.discovery import extract_neighbors
+from app.health import score_device_health
 from app.models import CommandResult, Device, DeviceBundle
+from app.normalization import build_device_summary
 from app.ssh_client import DeviceSSHClient
+from app.troubleshooting import build_troubleshooting_bundle
 from app.vendor_profiles import get_vendor_commands, validate_device_command_set
 
 
@@ -136,6 +139,29 @@ def _safe_filename(name: str) -> str:
     return safe or "device"
 
 
+def _merge_health_into_summary(summary: Dict[str, Any], health: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge health scoring into an existing summary without removing fields."""
+    merged = dict(summary)
+    merged.update({
+        "health_score": health["score"],
+        "warnings": health["warnings"],
+        "critical": health["critical"],
+    })
+    return merged
+
+
+def _write_analysis_artifacts(bundle: DeviceBundle, device_dir: Path) -> None:
+    """Write raw summary merged with health, plus troubleshooting bundle."""
+    normalized_summary = build_device_summary(bundle)
+    health = score_device_health(normalized_summary)
+    troubleshooting = build_troubleshooting_bundle(normalized_summary, health, bundle.raw_outputs or {})
+
+    summary_with_health = _merge_health_into_summary(bundle.summary, health)
+
+    (device_dir / "summary.json").write_text(json.dumps(summary_with_health, indent=2), encoding="utf-8")
+    (device_dir / "troubleshooting_bundle.json").write_text(json.dumps(troubleshooting, indent=2), encoding="utf-8")
+
+
 def write_bundle(bundle: DeviceBundle, output_dir: str | Path) -> Path:
     directory = Path(output_dir)
     directory.mkdir(parents=True, exist_ok=True)
@@ -171,6 +197,10 @@ def write_bundle(bundle: DeviceBundle, output_dir: str | Path) -> Path:
         "Please summarize device state, call out any warnings, and provide suspected causes or next steps."
     )
     (device_dir / "ai_prompt.txt").write_text(ai_prompt, encoding="utf-8")
+
+    if not str(bundle.summary.get("status", "")).startswith("dry-run"):
+        _write_analysis_artifacts(bundle, device_dir)
+
     zip_bundle(device_dir)
 
     return device_dir

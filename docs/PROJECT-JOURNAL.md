@@ -1142,3 +1142,124 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-014A-AITroubleshootingBundleRemediation.
+
+---
+
+Date: 2026-08-05
+Agent: Claude
+
+Phase: PHASE-015-CLIAnalysisPipelineIntegration
+
+Changes:
+- Selected CLI Analysis Pipeline Integration as next implementation phase, overriding the reviewer's PHASE-014A suggestion (PHASE-014's finding was accepted as a coverage gap, not a defect; no remediation required).
+
+Reason:
+- PHASE-012, PHASE-013, and PHASE-014 each carry the same outstanding risk: `build_device_summary()`, `score_device_health()`, and `build_troubleshooting_bundle()` are implemented and tested but unreachable from `app/cli.py`. Wiring them into the existing collection pipeline is the smallest change that proves the full analysis chain end-to-end and is a prerequisite for Wishlist Phase 14 (Topology-Aware Troubleshooting), which needs real per-device bundles to operate on.
+
+Risks Introduced:
+- None (selection only).
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-015-CLIAnalysisPipelineIntegration.md.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-015-CLIAnalysisPipelineIntegration
+
+Changes:
+- Wired `build_device_summary()` → `score_device_health()` → `build_troubleshooting_bundle()` into `app/cli.py` for both recursive and non-recursive collection paths.
+- Added `_write_analysis_artifacts()` helper to write `summary.json` (normalized summary + health score/warnings/critical) and `troubleshooting_bundle.json` per device.
+- Guarded analysis artifact writes so dry-run mode is unaffected.
+- Preserved existing `bundle_manifest.json` and `topology.json` output shapes.
+- Added 5 regression tests covering non-recursive artifacts, recursive artifacts, dry-run behavior, existing output preservation, and deterministic pipeline order.
+
+Reason:
+- Acceptance criteria require the analysis chain to be reachable from the CLI and to produce the new artifacts alongside existing bundle outputs with no behavior changes to collection, checkpointing, or dry-run modes.
+
+Risks Introduced:
+- `summary.json` now contains additional `health_score`, `warnings`, and `critical` keys; consumers parsing it as a raw bundle summary may need to tolerate extra keys.
+
+Risks Resolved:
+- Normalization, health scoring, and troubleshooting bundle functions are now exercised end-to-end by the CLI.
+
+Next Recommended Action:
+- Review PHASE-015-CLIAnalysisPipelineIntegration.
+
+---
+
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-015-CLIAnalysisPipelineIntegration
+
+Changes:
+- Reviewed the CLI analysis integration and its focused regression coverage.
+
+Reason:
+- The required call order, recursive/non-recursive execution, dry-run guard, and manifest/topology preservation are present, but the implementation overwrites the pre-existing raw `summary.json` and creates the device ZIP before analysis artifacts are written.
+
+Risks Introduced:
+- Packaged device ZIPs omit `summary.json` analysis content and `troubleshooting_bundle.json`.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-015A-CLIAnalysisPipelineIntegrationRemediation to preserve the raw summary contract and package analysis artifacts.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-015A-CLIAnalysisPipelineIntegrationRemediation
+
+Changes:
+- Moved analysis artifact generation from `app/cli.py` into `app/collector.write_bundle()` so artifacts are produced before the device ZIP is created.
+- `summary.json` now merges health fields (`health_score`, `warnings`, `critical`) into the existing raw `bundle.summary` instead of replacing it.
+- `troubleshooting_bundle.json` is written before `zip_bundle()` so it is included in the archive.
+- Removed `_write_analysis_artifacts()` from `app/cli.py`; CLI now relies on `write_bundle()` for all per-device outputs.
+- Gated analysis artifact writes on bundle status not starting with `dry-run`, preserving dry-run behavior without changing `write_bundle()` signature.
+- Updated and added regression tests: merged raw+health summary, dry-run ZIP contents, recursive ZIP contents, non-recursive ZIP packaging, and deterministic pipeline order in `write_bundle()`.
+
+Reason:
+- Remediation acceptance criteria require preserving the raw bundle summary contract and packaging analysis artifacts inside the final device ZIP.
+
+Risks Introduced:
+- None beyond the existing accepted risk that summary.json consumers must tolerate extra health keys.
+
+Risks Resolved:
+- Raw bundle summary fields are no longer discarded.
+- Device ZIPs now contain both merged `summary.json` and `troubleshooting_bundle.json`.
+- Dry-run, recursive, checkpoint, and collection behavior remain unchanged.
+
+Next Recommended Action:
+- Review PHASE-015A-CLIAnalysisPipelineIntegrationRemediation.
+
+---
+
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-015A-CLIAnalysisPipelineIntegrationRemediation
+
+Changes:
+- Reviewed raw summary preservation, ZIP packaging order, dry-run behavior, recursive and non-recursive paths, and regression coverage.
+
+Reason:
+- The raw `bundle.summary` fields are retained with merged health fields; analysis artifacts are written before ZIP creation and verified in both path-specific archives. Existing manifests, topology, checkpoints, collection behavior, and analysis modules remain unchanged.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- The PHASE-015 raw summary overwrite and incomplete ZIP archive defects are resolved.
+
+Next Recommended Action:
+- Select the next phase from the project roadmap.
