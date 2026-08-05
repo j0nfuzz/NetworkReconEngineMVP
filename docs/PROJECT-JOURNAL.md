@@ -1073,3 +1073,72 @@ Risks Resolved:
 
 Next Recommended Action:
 - Select the next implementation phase.
+
+---
+
+Date: 2026-08-05
+Agent: Claude
+
+Phase: PHASE-014-AITroubleshootingBundle
+
+Changes:
+- Selected AI Troubleshooting Bundle as the next implementation phase (Wishlist Phase 13).
+
+Reason:
+- PHASE-012/012A provide deterministic normalized summaries and PHASE-013/013A provide health results; a pure, structured briefing is the smallest step that reuses both and prepares retained evidence for future AI analysis without introducing an AI dependency, CLI wiring, or collection changes.
+
+Risks Introduced:
+- None (selection only).
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-014-AITroubleshootingBundle.md.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-014-AITroubleshootingBundle
+
+Changes:
+- Added app/troubleshooting.py with `build_troubleshooting_bundle(summary, health, raw_outputs)`.
+- Produces deterministic AI-ready briefing with device identity, health score, warnings, critical findings, evidence source names, and plain-text brief.
+- References raw evidence by command/source name only; no command output copied into the brief.
+- Added 5 regression tests for complete output, missing data, shape/order, evidence references, and input immutability.
+
+Reason:
+- Acceptance criteria required a structured troubleshooting bundle built from existing normalized summaries, health results, and raw_outputs without AI calls, CLI wiring, or collection changes.
+
+Risks Introduced:
+- Briefing is generic until future vendor- or topology-aware analysis phases.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Review PHASE-014-AITroubleshootingBundle.
+
+---
+
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-014-AITroubleshootingBundle
+
+Changes:
+- Reviewed deterministic bundle construction, evidence references, and regression coverage.
+
+Reason:
+- Critical findings are implemented but not covered by a non-empty regression case.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-014A-AITroubleshootingBundleRemediation.
