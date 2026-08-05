@@ -2,10 +2,17 @@ Folder PATH listing for volume Windows
 Volume serial number is 6003-0716
 C:.
 ¦   .gitignore
+¦   Context packs.txt
+¦   IMPLEMENTED-PHASE-011-CLIRecursiveCollectionIntegration.md
+¦   IMPLEMENTED-PHASE-011A-CLIRecursiveCollectionRemediation.md
+¦   IMPLEMENTED-PHASE-012-DataNormalisation.md
 ¦   interactive_bootstrap.ps1
 ¦   README.md
 ¦   requirements-legacy.txt
 ¦   requirements.txt
+¦   REVIEW-PHASE-011-CLIRecursiveCollectionIntegration.md
+¦   REVIEW-PHASE-011A-CLIRecursiveCollectionRemediation.md
+¦   REVIEW-PHASE-012-DataNormalisation.md
 ¦   tree.txt
 ¦   Wishes-Claude-Sonnet-5.md
 ¦   Wishes-GPT5.6-Sonnet.md
@@ -6574,22 +6581,36 @@ C:.
 ¦           pythonw.exe
 ¦           
 +---app
+¦   ¦   checkpoint.py
+¦   ¦   classification.py
 ¦   ¦   cli.py
 ¦   ¦   collector.py
 ¦   ¦   config.py
 ¦   ¦   detector.py
+¦   ¦   discovery.py
 ¦   ¦   models.py
+¦   ¦   normalization.py
+¦   ¦   orchestrator.py
 ¦   ¦   ssh_client.py
+¦   ¦   topology.py
+¦   ¦   traversal.py
 ¦   ¦   vendor_profiles.py
 ¦   ¦   __init__.py
 ¦   ¦   
 ¦   +---__pycache__
+¦           checkpoint.cpython-312.pyc
+¦           classification.cpython-312.pyc
 ¦           cli.cpython-312.pyc
 ¦           collector.cpython-312.pyc
 ¦           config.cpython-312.pyc
 ¦           detector.cpython-312.pyc
+¦           discovery.cpython-312.pyc
 ¦           models.cpython-312.pyc
+¦           normalization.cpython-312.pyc
+¦           orchestrator.cpython-312.pyc
 ¦           ssh_client.cpython-312.pyc
+¦           topology.cpython-312.pyc
+¦           traversal.cpython-312.pyc
 ¦           vendor_profiles.cpython-312.pyc
 ¦           __init__.cpython-312.pyc
 ¦           
@@ -6626,12 +6647,69 @@ C:.
 ¦           summary.json
 ¦           
 +---docs
-¦       DESIGN-DECISION-REGISTER.md
-¦       PROJECT-JOURNAL.md
-¦       PROJECT-STANDARD.md
-¦       tree.txt
-¦       Wishlist.md
-¦       
+¦   ¦   DESIGN-DECISION-REGISTER.md
+¦   ¦   PROJECT-JOURNAL.md
+¦   ¦   PROJECT-STANDARD.md
+¦   ¦   tree.txt
+¦   ¦   Wishlist.md
+¦   ¦   
+¦   +---Phases
+¦           IMPLEMENTED-PHASE-001-VendorPlatformIdentity.md
+¦           IMPLEMENTED-PHASE-002-RoleDetection.md
+¦           IMPLEMENTED-PHASE-002A-RoleDetectionRemediation.md
+¦           IMPLEMENTED-PHASE-003-VendorCommandProfiles.md
+¦           IMPLEMENTED-PHASE-004-DeviceDiscovery.md
+¦           IMPLEMENTED-PHASE-005-TopologyGraph.md
+¦           IMPLEMENTED-PHASE-005A-TopologyGraphRemediation.md
+¦           IMPLEMENTED-PHASE-006-TraversalEngine.md
+¦           IMPLEMENTED-PHASE-006A-TraversalEngineRemediation.md
+¦           IMPLEMENTED-PHASE-007-NeighborSupportClassification.md
+¦           IMPLEMENTED-PHASE-007A-NeighborSupportClassificationRemediation.md
+¦           IMPLEMENTED-PHASE-008-CredentialManagement.md
+¦           IMPLEMENTED-PHASE-009-RecursiveNeighborCollection.md
+¦           IMPLEMENTED-PHASE-009A-RecursiveNeighborCollectionRemediation.md
+¦           IMPLEMENTED-PHASE-010-Checkpointing.md
+¦           IMPLEMENTED-PHASE-010A-CheckpointingRemediation.md
+¦           IMPLEMENTED-PHASE-010B-CheckpointFailurePersistenceRemediation.md
+¦           PHASE-001-VendorPlatformIdentity.md
+¦           PHASE-002-RoleDetection.md
+¦           PHASE-002A-RoleDetectionRemediation.md
+¦           PHASE-003-VendorCommandProfiles.md
+¦           PHASE-004-DeviceDiscovery.md
+¦           PHASE-005-TopologyGraph.md
+¦           PHASE-005A-TopologyGraphRemediation.md
+¦           PHASE-006-TraversalEngine.md
+¦           PHASE-006A-TraversalEngineRemediation.md
+¦           PHASE-007-NeighborSupportClassification.md
+¦           PHASE-007A-NeighborSupportClassificationRemediation.md
+¦           PHASE-008-CredentialManagement.md
+¦           PHASE-009-RecursiveNeighborCollection.md
+¦           PHASE-009A-RecursiveNeighborCollectionRemediation.md
+¦           PHASE-010-Checkpointing.md
+¦           PHASE-010A-CheckpointingRemediation.md
+¦           PHASE-010B-CheckpointFailurePersistenceRemediation.md
+¦           PHASE-011-CLIRecursiveCollectionIntegration.md
+¦           PHASE-011A-CLIRecursiveCollectionRemediation.md
+¦           PHASE-012-DataNormalisation.md
+¦           PHASE-012A-DataNormalisationRemediation.md
+¦           REVIEW-PHASE-001-VendorPlatformIdentity.md
+¦           REVIEW-PHASE-002-RoleDetection.md
+¦           REVIEW-PHASE-002A-RoleDetectionRemediation.md
+¦           REVIEW-PHASE-003-VendorCommandProfiles.md
+¦           REVIEW-PHASE-004-DeviceDiscovery.md
+¦           REVIEW-PHASE-005-TopologyGraph.md
+¦           REVIEW-PHASE-005A-TopologyGraphRemediation.md
+¦           REVIEW-PHASE-006-TraversalEngine.md
+¦           REVIEW-PHASE-006A-TraversalEngineRemediation.md
+¦           REVIEW-PHASE-007-NeighborSupportClassification.md
+¦           REVIEW-PHASE-007A-NeighborSupportClassificationRemediation.md
+¦           REVIEW-PHASE-008-CredentialManagement.md
+¦           REVIEW-PHASE-009-RecursiveNeighborCollection.md
+¦           REVIEW-PHASE-009A-RecursiveNeighborCollectionRemediation.md
+¦           REVIEW-PHASE-010-Checkpointing.md
+¦           REVIEW-PHASE-010A-CheckpointingRemediation.md
+¦           REVIEW-PHASE-010B-CheckpointFailurePersistenceRemediation.md
+¦           
 +---live_output
 ¦   ¦   bundle_manifest.json
 ¦   ¦   sample-aruba-switch.zip
@@ -6664,10 +6742,20 @@ C:.
 ¦           summary.json
 ¦           
 +---tests
+¦   ¦   test_checkpoint.py
 ¦   ¦   test_cli.py
+¦   ¦   test_config.py
+¦   ¦   test_detector.py
+¦   ¦   test_normalization.py
+¦   ¦   test_orchestrator.py
 ¦   ¦   
 ¦   +---__pycache__
+¦           test_checkpoint.cpython-312-pytest-9.1.1.pyc
 ¦           test_cli.cpython-312-pytest-9.1.1.pyc
+¦           test_config.cpython-312-pytest-9.1.1.pyc
+¦           test_detector.cpython-312-pytest-9.1.1.pyc
+¦           test_normalization.cpython-312-pytest-9.1.1.pyc
+¦           test_orchestrator.cpython-312-pytest-9.1.1.pyc
 ¦           
 +---test_bootstrap
     ¦   bundle_manifest.json

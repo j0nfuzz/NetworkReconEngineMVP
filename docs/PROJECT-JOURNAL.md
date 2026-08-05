@@ -865,3 +865,211 @@ Risks Resolved:
 
 Next Recommended Action:
 - Re-review PHASE-011/011A.
+---
+
+Date: 2026-08-05
+Agent: Claude
+
+Phase: PHASE-012-DataNormalisation
+
+Changes:
+- Selected Data Normalisation as next implementation phase (Wishlist Phase 12).
+
+Reason:
+- All collected diagnostics are still vendor-specific raw text; Health Scoring (Wishlist Phase 11) and the AI Troubleshooting Bundle (Phase 13) both require a deterministic, vendor-independent summary.json shape first. Parallel Collection (Phase 9) would add asyncssh and concurrency risk with no new dependency justification yet, so Data Normalisation is the smaller, lower-risk, more unlocking step: it reuses existing collected bundles, needs no SSH/CLI changes, and directly unblocks two future phases.
+
+Risks Introduced:
+- None (selection only).
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-012-DataNormalisation.md.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-012-DataNormalisation
+
+Changes:
+- Added app/normalization.py with build_device_summary() producing a vendor-independent summary structure.
+- Cisco-specific parsers for version, model, uptime_days, cpu, memory, routes, arp_entries, interface_errors.
+- Safe defaults for missing or unparseable fields; no mutation of bundle.raw_outputs or bundle.summary.
+- Added 5 regression tests covering full summary, missing values, deterministic shape, unknown vendor, and bundle immutability.
+
+Reason:
+- Acceptance criteria required deterministic normalized output from existing DeviceBundle data without SSH/commands/CLI changes.
+
+Risks Introduced:
+- Cisco format drift may produce silent defaults; other vendors currently return all defaults.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Review PHASE-012-DataNormalisation.md.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-012A-DataNormalisationRemediation
+
+Changes:
+- `_find_cisco_interface_errors()` in app/normalization.py now evaluates all supported counters (`input errors`, `output errors`, `CRC`) on an interface line using `re.finditer()`.
+- An interface is flagged whenever any counter is nonzero.
+- Added regression tests for the exact false-negative case `0 input errors, 678 CRC` and a mixed-counters case proving only all-zero interfaces are excluded.
+
+Reason:
+- Reviewer found the parser only tested the first matched counter and silently omitted interfaces with a zero first counter but nonzero later counters.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- False-negative interface error detection for mixed zero/nonzero counter lines.
+
+Next Recommended Action:
+- Re-review PHASE-012-DataNormalisationRemediation.
+
+---
+
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-012A-DataNormalisationRemediation
+
+Changes:
+- Reviewed the interface-error counter remediation and its regression coverage.
+
+Reason:
+- The parser now evaluates all supported counters on each interface detail line; focused tests confirm zero input errors with nonzero CRC is flagged while all-zero interfaces remain excluded.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- False-negative interface errors caused by only evaluating the first counter on a line.
+
+Next Recommended Action:
+- Select the next implementation phase; Health Scoring remains deferred until selected.
+
+---
+
+Date: 2026-08-05
+Agent: Claude
+
+Phase: PHASE-013-HealthScoring
+
+Changes:
+- Selected Health Scoring as next implementation phase (Wishlist Phase 11).
+
+Reason:
+- PHASE-012/012A already produce a deterministic, vendor-independent summary.json shape (cpu, memory, interface_errors, uptime_days); Health Scoring is a pure function over that existing output, needs no SSH/CLI/collection changes, carries no new dependencies, and directly unblocks Phase 13's AI Troubleshooting Bundle, which requires a health assessment to summarise.
+
+Risks Introduced:
+- None (selection only).
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-013-HealthScoring.md.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-013-HealthScoring
+
+Changes:
+- Added app/health.py with `score_device_health(summary: dict) -> dict`.
+- Deterministic rules-based scoring over existing normalized summary fields (cpu, memory, interface_errors, uptime_days).
+- Score starts at 100, applies fixed deductions for high CPU (>80), high memory (>80), interface errors, and unknown uptime.
+- Added 7 regression tests covering healthy, single-issue, multi-issue, missing-data, and output-shape cases.
+
+Reason:
+- Acceptance criteria required a deterministic health score and warnings/critical lists derived from normalized summaries without changing normalization or CLI.
+
+Risks Introduced:
+- Fixed 80% CPU/memory thresholds may not suit all device roles.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Review PHASE-013-HealthScoring.
+
+---
+
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-013-HealthScoring
+
+Changes:
+- Reviewed deterministic health scoring and its regression coverage.
+
+Reason:
+- Missing `uptime_days` is deducted as unknown uptime, contrary to the all-missing-data acceptance criterion.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Implement PHASE-013A-HealthScoringRemediation.
+
+---
+
+Date: 2026-08-05
+Agent: Kimi
+
+Phase: PHASE-013A-HealthScoringRemediation
+
+Changes:
+- Removed the uptime-unknown deduction/warning from `score_device_health()` in app/health.py.
+- Missing or `None` `uptime_days` is now treated as no evidence.
+- Updated `test_score_device_missing_data` and `test_score_device_multiple_issues` expectations.
+- Added `test_score_device_explicit_uptime_none_is_no_evidence`.
+
+Reason:
+- Acceptance criteria required missing values to be no evidence, with all-missing summaries scoring 100 and producing no warnings.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- False deduction/warning when uptime data is unavailable.
+
+Next Recommended Action:
+- Re-review PHASE-013-HealthScoringRemediation.
+
+---
+
+Date: 2026-08-05
+Agent: GPT Reviewer
+
+Phase: PHASE-013A-HealthScoringRemediation
+
+Changes:
+- Reviewed the missing-uptime remediation and its regression coverage.
+
+Reason:
+- Focused tests confirm missing or `None` `uptime_days` is treated as no evidence; CPU, memory, and interface-error scoring remain unchanged.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- False deduction/warning when uptime data is unavailable.
+
+Next Recommended Action:
+- Select the next implementation phase.
