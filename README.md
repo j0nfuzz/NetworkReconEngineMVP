@@ -1,4 +1,4 @@
-# Network Device Diagnostics Collector
+# Network Recon Engine
 
 A read-only SSH diagnostics tool for collecting device telemetry and packaging it into an AI-ready bundle.
 
