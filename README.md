@@ -1,147 +1,148 @@
-# Network Device Diagnostics
+# Network Recon Engine
 
-Network Device Diagnostics is a read-only SSH collection tool for Windows network technicians. It collects diagnostic evidence from network devices, discovers connected infrastructure, and produces per-device troubleshooting bundles for engineer review or AI-assisted analysis.
+A read-only SSH diagnostics tool for collecting device telemetry and packaging it into an AI-ready bundle.
 
-The tool does not make configuration changes to network devices. It validates collection commands before use and records collected evidence in structured files and ZIP archives.
+This project is designed to be safe and operationally useful:
 
-## Capabilities
+- no configuration writes are attempted
+- only diagnostic commands are allowed
+- output is grouped into a per-device bundle for review or AI analysis
+- it supports interactive startup and direct CLI execution
 
-- YAML device inventory and direct CLI execution.
-- Interactive Windows PowerShell bootstrap.
-- Python 3.12+ discovery, virtual-environment validation, and stale-environment recovery.
-- SSH collection with vendor detection, deterministic role classification, and vendor/role command profiles.
-- Read-only command enforcement and raw command-output retention.
-- Modern and legacy SSH profile selection for older devices.
-- Neighbor discovery, topology mapping, recursive collection, checkpointing, and resume support.
-- Normalized device summaries, deterministic health scoring, and troubleshooting bundles.
-- Per-device ZIP packaging plus output manifest and topology data.
+## Features
 
-## Requirements
+- YAML-based device inventory
+- interactive PowerShell bootstrap for host, username, port, and password
+- SSH connectivity via Paramiko
+- vendor-aware command profiles for Cisco, Juniper, Aruba, Arista, and generic devices
+- strict read-only command enforcement
+- legacy SSH KEX fallback handling for older network appliances
+- raw command output capture
+- bundle generation with summary and AI prompt output
+- ZIP packaging for each device bundle
+- dry-run validation mode
+- verbose SSH collection diagnostics
 
-- Windows with PowerShell.
-- Python 3.12 or later, available through the Windows `py` launcher or `python` on `PATH`.
-- Network reachability and valid SSH credentials for the target device.
+## Safety model
 
-The bootstrap installs Python package dependencies from the repository requirements files. See [docs/HOWTO-PORTABLE.md](docs/HOWTO-PORTABLE.md) for moving the repository to another workstation and resolving setup failures.
+This tool is intentionally read-only.
 
-## Quick Start
+- no `configure`, `copy`, `write`, or change commands are permitted
+- vendor profiles only include safe show/get style commands
+- the app validates the command set before collection starts
+- all output is focused on diagnostics, troubleshooting, and AI-assisted analysis
 
-From the repository root, run:
+## Quick start
+
+### Option 1: interactive bootstrap (recommended)
+
+From the project root:
 
 ```powershell
 .\interactive_bootstrap.ps1
 ```
 
-The bootstrap prompts for the target host, SSH credentials, port, timeout, host-key policy, and optional `known_hosts` file. It creates `config\interactive_devices.yml`, prepares the required virtual environment, then starts collection.
+This will:
 
-By default, the bootstrap probes the target to choose a modern or legacy SSH dependency profile. To force the profile:
+- prompt for the switch/router host/IP, username, port, and password
+- prompt for timeout, host-key policy (`auto`/`reject`/`warning`), and an optional `known_hosts` file
+- **auto-detect** the SSH profile by probing the device (modern vs legacy/SHA-1), so operators don't need to know in advance
+- create the local virtual environment if needed (`.venv` for modern, `.venv-legacy` for legacy)
+- install dependencies unless `-SkipInstall` is used
+- build a temporary config and run the collection
 
-```powershell
-.\interactive_bootstrap.ps1 -ParamikoProfile modern
-.\interactive_bootstrap.ps1 -ParamikoProfile legacy
-```
+You can force a profile explicitly with `-ParamikoProfile modern` or `-ParamikoProfile legacy`; the default `auto` probes the device to decide.
 
-On a repeat run where dependencies are already installed:
+You can also skip the dependency reinstall step on repeat runs:
 
 ```powershell
 .\interactive_bootstrap.ps1 -SkipInstall
 ```
 
-## Direct CLI Usage
+### Option 2: direct CLI run
 
-Use direct CLI execution when you maintain an inventory file. Example `config\devices.yml`:
+Create or update `config/devices.yml`:
 
 ```yaml
 devices:
   - name: access-switch-01
     hostname: 10.0.0.10
-    vendor: auto
+    vendor: aruba
     port: 22
     username: admin
     password: "<PASSWORD>"
 ```
 
-Validate the inventory without attempting SSH:
+Then run a dry validation:
 
 ```powershell
-.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --dry-run
+.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir demo_output --dry-run
 ```
 
-Run live collection:
+Run a live collection:
 
 ```powershell
 .\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output
 ```
 
-Useful options:
-
-- `--verbose`: print detailed connection and collection diagnostics.
-- `--probe`: report reachability and modern/legacy SSH classification, then exit.
-- `--recursive`: collect recursively from the first configured device.
-- `--checkpoint-file <path>`: load and update a JSON checkpoint for recursive resume.
-
-For example:
+Run with detailed SSH diagnostics:
 
 ```powershell
-.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --recursive --checkpoint-file output\checkpoint.json --verbose
+.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --verbose
 ```
 
-## Collection Behavior
+## Live run behavior
 
-For a live collection, the tool:
+The tool will:
 
-1. Connects over SSH and identifies the vendor/platform where automatic detection is selected.
-2. Classifies the device role using deterministic heuristics.
-3. Runs the allowed read-only diagnostics for the selected vendor and role.
-4. Retains raw command output and extracts supported neighbors.
-5. Builds a normalized summary, health score, warnings, critical findings, and troubleshooting bundle.
-6. Packages every device directory as a ZIP archive.
+- test SSH reachability
+- detect vendor automatically when configured as `vendor: auto`
+- run the allowed read-only commands for that device family
+- capture raw output for each command
+- write a device bundle and summary JSON
+- create an AI prompt file suitable for troubleshooting analysis
+- export the final bundle as a ZIP archive
 
-Dry runs validate configuration and create simulated raw outputs. They do not create health-scoring or troubleshooting artifacts.
+## Output format
 
-## Generated Outputs
+Each device produces a directory under the output folder, for example:
 
-The selected output directory contains `bundle_manifest.json` and, for normal non-dry-run collection, `topology.json`. Each collected device has a directory and adjacent ZIP archive, for example:
+- `output/access-switch-01/`
+  - `summary.json`
+  - `show_version.txt`
+  - `show_interfaces_brief.txt`
+  - `ai_prompt.txt`
+  - `access-switch-01.zip`
 
-```text
-output/
-  bundle_manifest.json
-  topology.json
-  access-switch-01/
-    summary.json
-    troubleshooting_bundle.json
-    ai_prompt.txt
-    show_version.txt
-    show_interfaces_brief.txt
-  access-switch-01.zip
-```
+The manifest is also written to:
 
-- `summary.json`: collection status, identity, role, neighbor data, command results, and merged health fields.
-- `troubleshooting_bundle.json`: structured normalized findings, health assessment, and troubleshooting briefing.
-- `ai_prompt.txt`: an evidence-oriented prompt that references the collected command artifacts.
-- `*.txt`: raw command outputs, retained for independent review.
-- `bundle_manifest.json`: run-level list of device bundles and statuses.
-- `topology.json`: discovered topology graph when generated by the CLI run.
+- `output/bundle_manifest.json`
 
-Each device ZIP includes the files in its device directory, including analysis artifacts for live collection.
+## SSH compatibility notes
 
-## Safety and SSH Compatibility
+Older network appliances sometimes reject modern Paramiko defaults during key exchange negotiation. The tool includes compatibility fallbacks for legacy algorithms and surfaces a clearer diagnostic message when the SSH peer is older or incompatible.
 
-This tool is intentionally read-only. Collection command sets are validated before use; configuration or write commands are not part of the supported workflow.
+If a device fails with an SSH handshake error, the connection logic will retry with legacy KEX fallbacks and print a more actionable explanation in verbose mode.
 
-The interactive bootstrap can select a legacy dependency profile for devices whose SSH handshake indicates older key-exchange compatibility. Host-key behavior is configurable as `auto`, `reject`, or `warning`; an optional `known_hosts` path can be supplied for stricter verification.
+Per-device host-key options are also supported in the inventory (`host_key_policy`, optional `known_hosts`), so strict verification can be enabled in production; see `config/devices.yml` and `interactive_bootstrap.ps1` for examples.
 
-## Project Layout
+## Project structure
 
-- `app/`: CLI, collector, discovery, topology, traversal, checkpoint, health, and troubleshooting code.
-- `config/`: inventory files and the bootstrap-generated interactive inventory.
-- `docs/`: project standards and operational documentation.
-- `tests/`: Python and PowerShell regression tests.
-- `interactive_bootstrap.ps1`: recommended Windows entry point.
+- `app/` - CLI, collector, SSH client, vendor profiles, and detection logic
+- `config/` - sample device inventory and generated runtime config
+- `tests/` - regression coverage for dry-run behavior, vendor detection, and SSH compatibility
+- `interactive_bootstrap.ps1` - single-command entry point for local setup and collection
 
-## Support Notes
+## Typical workflow
 
-- Use `--dry-run` to validate inventory format without contacting devices.
-- Use `--probe` when diagnosing SSH reachability or modern/legacy profile selection.
-- Use `--verbose` when reporting a collection issue.
-- Review the raw `*.txt` evidence alongside generated summaries before acting on findings.
+1. Start the project with `interactive_bootstrap.ps1`
+2. Enter the device host, username, port, and password
+3. Review the generated bundle under the output directory
+4. Use the AI prompt and summary files to investigate the device state
+
+## Requirements
+
+- Python 3.10+
+- Paramiko
+- PyYAML
+- Windows PowerShell is used for the interactive bootstrap script, but the Python CLI itself can be run in a standard Python env
