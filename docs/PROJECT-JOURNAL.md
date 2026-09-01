@@ -1543,3 +1543,78 @@ Risks Resolved:
 Next Recommended Action:
 - Re-review PHASE-020 chain and close if accepted.
 
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-021-PortableDistribution
+
+Changes:
+- Added build_portable.py (PyInstaller single-file build script) and run_portable.py (packaged CLI entry point).
+- Built dist/NetworkDeviceDiagnostics.exe containing bundled dependencies.
+- Updated README.md and docs/HOWTO-PORTABLE.md with packaged executable workflow.
+- Verified source workflow tests continue to pass (tests/test_cli.py: 55 passed).
+
+Reason:
+- Deliver the target engineer experience (download, launch, collect, receive bundle) without requiring Git, Python, or virtual environment management.
+
+Risks Introduced:
+- PyInstaller may require additional hidden imports for edge-case SSH dependencies.
+- Unsigned executable may trigger SmartScreen or antivirus warnings.
+
+Risks Resolved:
+- Portable execution path now exists for workstations without a Python toolchain.
+
+Next Recommended Action:
+- Review PHASE-021 and verify the packaged executable on a clean workstation.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-021-PortableDistribution (validation)
+
+Changes:
+- Determined the packaged one-file executable was blocked by SentinelOne EDR, not by a packaging defect or missing dependency.
+- Switched build_portable.py to PyInstaller onedir mode; onedir executable launches and passes --help and --probe tests.
+- Updated README.md and HOWTO-PORTABLE.md to reference dist\NetworkDeviceDiagnostics\NetworkDeviceDiagnostics.exe and note endpoint-protection quarantine risk.
+- Updated IMPLEMENTED-PHASE-021-PortableDistribution.md with validation findings.
+
+Reason:
+- One-file PyInstaller output failed with Access is denied and was deleted post-build; onedir output is EDR-compatible in this environment and still provides a single runnable executable.
+
+Risks Introduced:
+- Unsigned onedir executable may still be quarantined by other endpoint protection products.
+
+Risks Resolved:
+- Portable build now produces a working executable in the build environment.
+
+Next Recommended Action:
+- Re-review PHASE-021 and validate on a workstation without SentinelOne restrictions.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-021-PortableDistributionPackagingRemediation
+
+Changes:
+- Updated build_portable.py to produce dist\NetworkDeviceDiagnostics.zip from the validated onedir output.
+- Updated README.md and docs/HOWTO-PORTABLE.md to describe ZIP-based distribution.
+- Created docs/Phases/IMPLEMENTED-PHASE-021-PortableDistributionPackagingRemediation.md.
+
+Reason:
+- REVIEW-PHASE-021 required the packaging contract to formally produce a single distributable artefact; the onedir ZIP satisfies this without reattempting onefile packaging.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Approved packaging contract now matches the validated onedir build and emits one distributable ZIP.
+
+Next Recommended Action:
+- Re-review PHASE-021 remediation chain and approve or reject.
+

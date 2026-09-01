@@ -203,9 +203,29 @@ Per-device host-key options are also supported in the inventory (`host_key_polic
 - `tests/` - regression coverage for dry-run behavior, vendor detection, and SSH compatibility
 - `interactive_bootstrap.ps1` - single-command entry point for local setup and collection
 
+## Portable distribution
+
+A self-contained Windows executable can be built from the repository using PyInstaller. This allows the tool to run on a workstation that does not have Python or Git installed.
+
+Build the executable from the project root:
+
+```powershell
+.\.venv\Scripts\python.exe -m build_portable
+```
+
+The build produces `dist\NetworkDeviceDiagnostics.zip`, a single archive containing `NetworkDeviceDiagnostics.exe` and its bundled dependencies. Extract the archive on the target workstation and run the executable with the same arguments as the Python CLI:
+
+```powershell
+.\NetworkDeviceDiagnostics.exe --config config\devices.yml --output-dir output
+```
+
+Some endpoint protection products may quarantine or delete unsigned executables; if this happens, restore the file from quarantine or build the executable on the target workstation.
+
+The source-based workflow remains available and unchanged for development or custom environments.
+
 ## Typical workflow
 
-1. Start the project with `interactive_bootstrap.ps1`
+1. Start the project with `interactive_bootstrap.ps1` or the packaged `NetworkDeviceDiagnostics.exe`
 2. Enter the device host, username, port, and password
 3. Review the generated bundle under the output directory
 4. Use the summary, troubleshooting bundle, and AI prompt files to investigate the device state

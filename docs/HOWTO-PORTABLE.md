@@ -2,6 +2,8 @@
 
 This guide explains how to run Network Device Diagnostics from a copied, extracted, or newly cloned repository on a Windows workstation. It is intended for technicians who do not need to manage Python virtual environments manually.
 
+For an entirely Python-free workflow, build or download the self-contained executable described in the [Packaged executable](#packaged-executable) section.
+
 ## Before You Start
 
 You need:
@@ -144,6 +146,38 @@ For each live-collected device, review:
 At the output root, `bundle_manifest.json` lists device bundles. CLI runs also generate topology data where applicable.
 
 Dry runs are different: they create simulated raw command output and a raw summary, but do not produce health-scoring or troubleshooting artifacts.
+
+## Packaged executable
+
+A self-contained Windows executable can be produced from a source checkout using PyInstaller.
+
+Build the executable:
+
+```powershell
+.\.venv\Scripts\python.exe -m build_portable
+```
+
+The result is written to:
+
+```text
+dist\NetworkDeviceDiagnostics.zip
+```
+
+Extract the zip on a target workstation. It does not require Python, Git, or a virtual environment. Run the executable with the same arguments as the Python CLI:
+
+```powershell
+.\NetworkDeviceDiagnostics.exe --config config\devices.yml --output-dir output --verbose
+```
+
+For a recursive run with a checkpoint file:
+
+```powershell
+.\NetworkDeviceDiagnostics.exe --config config\devices.yml --output-dir output --recursive --checkpoint-file output\checkpoint.json --verbose
+```
+
+The packaged executable bundles the same dependencies and command profiles used by the source workflow. Distributing it requires placing the extracted `NetworkDeviceDiagnostics` folder, a valid `config\devices.yml`, and an output location on the target workstation.
+
+Some endpoint protection products may quarantine or delete unsigned executables. If the executable is removed after copying, restore it from the endpoint protection quarantine or build the package directly on the target workstation.
 
 ## Direct CLI Recovery
 
