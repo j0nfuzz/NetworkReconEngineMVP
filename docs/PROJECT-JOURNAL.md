@@ -1496,3 +1496,50 @@ Risks Resolved:
 Next Recommended Action:
 - Re-review PHASE-019 and close the PHASE-018 chain.
 
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-020-DocumentationOperationalGuidance
+
+Changes:
+- Updated README.md to document recursive collection, --target-device scoping, --max-concurrent behaviour (default 5, ceiling 10), and --checkpoint-file resume capability.
+- Added README sections for summary.json, troubleshooting_bundle.json, topology.json, and bundle_manifest.json.
+- Created docs/Phases/IMPLEMENTED-PHASE-020-DocumentationOperationalGuidance.md.
+
+Reason:
+- README.md described only flat per-device collection; implemented recursive, scoped, checkpointed, and parallel features required operational documentation for network engineers.
+
+Risks Introduced:
+- None (documentation-only change).
+
+Risks Resolved:
+- README no longer understates platform capability, reducing reliance on tribal knowledge during network engineer onboarding.
+
+Next Recommended Action:
+- Re-review PHASE-020 and consider scheduling Phase 18 (Portable Distribution).
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-020-DocumentationOperationalGuidanceRemediation
+
+Changes:
+- Added default-behaviour statements for --recursive, --target-device, and --checkpoint-file to README.md.
+- Created docs/Phases/IMPLEMENTED-PHASE-020-DocumentationOperationalGuidanceRemediation.md.
+
+Reason:
+- REVIEW-PHASE-020 found README omitted inactive defaults for these flags; this remediation addresses the documented operational gap.
+
+Risks Introduced:
+- None (documentation-only change).
+
+Risks Resolved:
+- Operators no longer need to inspect CLI help to infer default collection, scoping, or checkpoint behaviour.
+
+Next Recommended Action:
+- Re-review PHASE-020 chain and close if accepted.
+

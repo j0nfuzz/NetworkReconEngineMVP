@@ -22,6 +22,9 @@ This project is designed to be safe and operationally useful:
 - ZIP packaging for each device bundle
 - dry-run validation mode
 - verbose SSH collection diagnostics
+- recursive collection with topology-aware scoping
+- checkpoint resume support
+- bounded parallel collection for scoped runs
 
 ## Safety model
 
@@ -91,6 +94,48 @@ Run with detailed SSH diagnostics:
 .\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --verbose
 ```
 
+## Recursive collection
+
+Collect from a seed device and discover neighbouring infrastructure devices automatically:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --recursive
+```
+
+The first device in the inventory becomes the seed. Supported neighbours (Cisco, Aruba, FortiGate, Juniper) are queued and collected automatically; unsupported devices are recorded but skipped. Omitting `--recursive` performs a flat, non-recursive collection of the configured devices only.
+
+### Scope collection to a target device and its neighbours
+
+Use `--target-device` to limit recursion to a single device and its direct topology neighbours:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --recursive --target-device core-switch-01
+```
+
+This requires a `topology.json` file in the output directory. If no topology file exists, collection is limited to the named device only. Omitting `--target-device` runs recursive collection unscoped using the sequential orchestrator without topology-based limiting. `--target-device` is the only path that enables parallel SSH sessions.
+
+### Bounded parallel collection
+
+When `--target-device` is used, multiple devices in scope are collected concurrently. The default concurrency is 5 and the maximum allowed is 10:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --recursive --target-device core-switch-01 --max-concurrent 8
+```
+
+Parallel collection is gated by scoping to prevent estate-wide AAA or device overload.
+
+## Checkpoint and resume
+
+Long-running recursive collections can be resumed. Pass `--checkpoint-file` to persist state after each device is processed:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --recursive --checkpoint-file output\checkpoint.json
+```
+
+Omitting `--checkpoint-file` runs collection without loading or saving checkpoint state. If the run is interrupted, rerun the same command. Visited, pending, successful, failed, and unsupported device lists are restored and the queue continues from the last saved state.
+
+When `--target-device` is used, checkpoint state is filtered to the same scope, so out-of-scope pending entries cannot re-enter the collection.
+
 ## Live run behavior
 
 The tool will:
@@ -108,15 +153,40 @@ The tool will:
 Each device produces a directory under the output folder, for example:
 
 - `output/access-switch-01/`
-  - `summary.json`
-  - `show_version.txt`
-  - `show_interfaces_brief.txt`
-  - `ai_prompt.txt`
-  - `access-switch-01.zip`
+  - `summary.json` - structured device state, health score, discovered neighbours
+  - `show_version.txt`, `show_interfaces_brief.txt`, ... - raw command output
+  - `ai_prompt.txt` - AI-ready diagnostic briefing
+  - `troubleshooting_bundle.json` - normalised summary + health assessment
+  - `access-switch-01.zip` - packaged device bundle
 
-The manifest is also written to:
+The following artefacts are also written to the output root:
 
-- `output/bundle_manifest.json`
+- `output/bundle_manifest.json` - list of all collected devices, sorted by device name
+- `output/topology.json` - discovered device graph; used by `--target-device` scoping
+
+### summary.json fields
+
+Key fields include:
+
+- `device` - inventory name
+- `hostname` - management address
+- `vendor` - detected or configured vendor
+- `platform` / `model` - platform identification when available
+- `role` - inferred device role when available
+- `commands_run` - number of diagnostic commands executed
+- `failed_commands` - list of commands that returned errors
+- `discovered_neighbors` - neighbour records from CDP/LLDP
+- `status` - one of `collected`, `partial`, `unreachable`, `dry-run-success`
+- `health_score` - numeric score added when collection completes successfully
+- `warnings` / `critical` - deterministic health observations
+
+### troubleshooting_bundle.json
+
+A condensed diagnostic bundle combining the normalised summary, health score, warnings, critical items, and selected raw outputs. It is intended for direct review or LLM-assisted troubleshooting without exposing every raw file.
+
+### topology.json
+
+A graph of discovered devices and their adjacencies. It is produced at the end of every run and is required by `--target-device` scoping for subsequent targeted collections.
 
 ## SSH compatibility notes
 
@@ -138,7 +208,8 @@ Per-device host-key options are also supported in the inventory (`host_key_polic
 1. Start the project with `interactive_bootstrap.ps1`
 2. Enter the device host, username, port, and password
 3. Review the generated bundle under the output directory
-4. Use the AI prompt and summary files to investigate the device state
+4. Use the summary, troubleshooting bundle, and AI prompt files to investigate the device state
+5. For larger environments, use `--recursive` with `--checkpoint-file` to discover neighbours and resume after an interruption
 
 ## Requirements
 
