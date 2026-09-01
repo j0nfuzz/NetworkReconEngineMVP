@@ -65,5 +65,5 @@ RISKS RESOLVED:
 - Default modern-device behaviour is unchanged.
 
 OPEN ISSUES:
-- Whether 192.168.21.30 will negotiate successfully under the legacy profile remains unconfirmed until field-tested.
+- Whether 192.0.2.30 will negotiate successfully under the legacy profile remains unconfirmed until field-tested.
 - Open question from phase file: should the embedded bundle ship both profiles side-by-side or remain single-profile-per-build? Current implementation remains single-profile-per-build with `--legacy` opt-in.

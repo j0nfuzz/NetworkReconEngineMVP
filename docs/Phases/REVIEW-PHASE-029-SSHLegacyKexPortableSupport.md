@@ -7,7 +7,14 @@ CRITICAL ISSUES:
 None
 
 MAJOR ISSUES:
-None
+Issue:
+Post-authentication command timeout causes partial collection without identifying the failed command in console output.
+
+Why It Matters:
+Field operators cannot distinguish a slow command, pagination, or an unsupported generic command profile from the terminal result alone.
+
+Recommended Fix:
+Implement a scoped command-collection timeout evidence phase.
 
 DDR REVIEW:
 
@@ -17,11 +24,10 @@ Approved
 
 OUTSTANDING RISKS:
 - The legacy profile permits known-weak algorithms and requires controlled, explicit use.
-- Field validation against 192.168.21.30 remains outstanding.
-- The complete suite remains non-green due to a pre-existing global-temp-file assertion; the isolated failing test passed.
+- The command that timed out and its exact device-side cause are not established by the field evidence.
 
 OPEN QUESTIONS:
-- Whether 192.168.21.30 supports a KEX algorithm available in Paramiko 2.12 remains unconfirmed.
+- Whether the timeout results from command duration, interactive paging, or a generic command-profile mismatch.
 
 RECOMMENDED NEXT PHASE:
-SSHLegacyKexFieldValidation
+CommandCollectionTimeoutEvidence

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import socket
 import struct
 import tempfile
 import zipfile
@@ -500,6 +501,202 @@ def test_run_command_returns_failure_for_eof_error():
     assert result["success"] is False
     assert result["exit_code"] == -1
     assert "remote closed connection" in result["error"]
+
+
+def test_run_command_records_elapsed_seconds_on_success():
+    class FakeChannel:
+        def recv_exit_status(self):
+            return 0
+
+    class FakeStdout:
+        channel = FakeChannel()
+
+        def read(self):
+            return b"success output"
+
+    class FakeStderr:
+        channel = FakeChannel()
+
+        def read(self):
+            return b""
+
+    class FakeSSHClient:
+        def exec_command(self, command, timeout=None):
+            return None, FakeStdout(), FakeStderr()
+
+    client = DeviceSSHClient("device.example", "user", "pass")
+    result = client.run_command("show version", client=FakeSSHClient())
+
+    assert result["success"] is True
+    assert result["stdout"] == "success output"
+    assert "elapsed_seconds" in result
+    assert isinstance(result["elapsed_seconds"], float)
+    assert result["elapsed_seconds"] >= 0
+
+
+def test_run_command_classifies_timeout_and_preserves_partial_output():
+    class FakeChannel:
+        def __init__(self):
+            self._stdout_buffer = b"partial line\n"
+            self._stderr_buffer = b""
+
+        def recv_ready(self):
+            return len(self._stdout_buffer) > 0
+
+        def recv(self, nbytes):
+            data = self._stdout_buffer
+            self._stdout_buffer = b""
+            return data
+
+        def recv_stderr_ready(self):
+            return len(self._stderr_buffer) > 0
+
+        def recv_stderr(self, nbytes):
+            data = self._stderr_buffer
+            self._stderr_buffer = b""
+            return data
+
+    class FakeStdout:
+        def __init__(self):
+            self.channel = FakeChannel()
+
+        def read(self):
+            raise socket.timeout("Command timed out")
+
+    class FakeStderr:
+        def __init__(self):
+            self.channel = FakeChannel()
+
+        def read(self):
+            return b""
+
+    class FakeSSHClient:
+        def exec_command(self, command, timeout=None):
+            return None, FakeStdout(), FakeStderr()
+
+    client = DeviceSSHClient("device.example", "user", "pass")
+    result = client.run_command("show version", client=FakeSSHClient())
+
+    assert result["success"] is False
+    assert result["exit_code"] == -1
+    assert result["error_type"] == "timeout"
+    assert "partial line" in result["stdout"]
+    assert "elapsed_seconds" in result
+    assert isinstance(result["elapsed_seconds"], float)
+
+
+def test_run_command_classifies_ssh_exception():
+    class FakeSSHClient:
+        def exec_command(self, command, timeout=None):
+            raise paramiko.SSHException("channel closed")
+
+    client = DeviceSSHClient("device.example", "user", "pass")
+    result = client.run_command("show version", client=FakeSSHClient())
+
+    assert result["success"] is False
+    assert result["exit_code"] == -1
+    assert result["error_type"] == "ssh_exception"
+    assert "channel closed" in result["error"]
+    assert "elapsed_seconds" in result
+
+
+def test_run_command_preserves_partial_stderr_on_ssh_exception():
+    class FakeChannel:
+        def __init__(self):
+            self._stdout_buffer = b""
+            self._stderr_buffer = b"partial error\n"
+
+        def recv_ready(self):
+            return len(self._stdout_buffer) > 0
+
+        def recv(self, nbytes):
+            data = self._stdout_buffer
+            self._stdout_buffer = b""
+            return data
+
+        def recv_stderr_ready(self):
+            return len(self._stderr_buffer) > 0
+
+        def recv_stderr(self, nbytes):
+            data = self._stderr_buffer
+            self._stderr_buffer = b""
+            return data
+
+    class FakeStdout:
+        def __init__(self):
+            self.channel = FakeChannel()
+
+        def read(self):
+            raise paramiko.SSHException("channel closed")
+
+    class FakeStderr:
+        def __init__(self):
+            self.channel = FakeChannel()
+
+        def read(self):
+            return b""
+
+    class FakeSSHClient:
+        def exec_command(self, command, timeout=None):
+            return None, FakeStdout(), FakeStderr()
+
+    client = DeviceSSHClient("device.example", "user", "pass")
+    result = client.run_command("show version", client=FakeSSHClient())
+
+    assert result["success"] is False
+    assert result["error_type"] == "ssh_exception"
+    assert "partial error" in result["stderr"]
+
+
+def test_execute_device_collection_records_failed_command_evidence(monkeypatch):
+    commands = ["show version"]
+    monkeypatch.setattr("app.collector.get_vendor_commands", lambda vendor, role=None: commands)
+
+    class FakeSSHClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def probe(self):
+            return {"reachable": True, "status": "connected"}
+
+        def connect(self):
+            return object()
+
+        def close(self, client):
+            return None
+
+        def run_command(self, command, *, client=None):
+            return {
+                "command": command,
+                "stdout": "partial output",
+                "stderr": "error text",
+                "exit_code": -1,
+                "success": False,
+                "error": "Command timed out or failed: timeout",
+                "elapsed_seconds": 7.5,
+                "error_type": "timeout",
+            }
+
+    monkeypatch.setattr(collector_module, "DeviceSSHClient", FakeSSHClient)
+
+    device = Device(
+        name="lab-switch",
+        hostname="10.0.0.12",
+        vendor="cisco",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    bundle = execute_device_collection(device, dry_run=False)
+
+    assert bundle.summary["status"] == "partial"
+    assert bundle.summary["failed_commands"] == commands
+    assert len(bundle.summary["failed_command_details"]) == 1
+    detail = bundle.summary["failed_command_details"][0]
+    assert detail["command"] == "show version"
+    assert detail["elapsed_seconds"] == 7.5
+    assert detail["error_type"] == "timeout"
+    assert bundle.failed_commands == commands
 
 
 def test_ssh_client_includes_supported_kex_fallbacks(monkeypatch):

@@ -43,6 +43,7 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
 
     raw_outputs: Dict[str, str] = {}
     failed_commands: List[str] = []
+    failed_command_details: List[Dict[str, object]] = []
     role = (device.metadata.get("role") or {}).get("role")
     commands = get_vendor_commands(device.vendor, role=role)
     invalid_commands = validate_device_command_set(commands)
@@ -106,14 +107,24 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
             if result["success"]:
                 raw_outputs[command] = result["stdout"]
             else:
-                raw_outputs[command] = f"ERROR: {result.get('error', 'Command failed')}\n{result.get('stderr', '')}"
+                raw_outputs[command] = (
+                    f"ERROR: {result.get('error', 'Command failed')}\n"
+                    f"STDOUT:\n{result.get('stdout', '')}\n"
+                    f"STDERR:\n{result.get('stderr', '')}"
+                )
                 failed_commands.append(command)
+                failed_command_details.append({
+                    "command": command,
+                    "elapsed_seconds": result.get("elapsed_seconds"),
+                    "error_type": result.get("error_type"),
+                })
             summary["commands_run"] += 1
     finally:
         ssh_client.close(connection)
 
     summary["status"] = "collected" if not failed_commands else "partial"
     summary["failed_commands"] = failed_commands
+    summary["failed_command_details"] = failed_command_details
     summary["discovered_neighbors"] = extract_neighbors(device.vendor, raw_outputs)
     return DeviceBundle(
         device_name=device.name,

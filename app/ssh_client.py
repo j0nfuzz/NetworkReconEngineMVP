@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import socket
 import struct
+import time
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import paramiko
 
@@ -221,9 +222,52 @@ class DeviceSSHClient:
             raise last_error
         raise RuntimeError("SSH connection failed without a reported error.")
 
+    @staticmethod
+    def _read_partial_output(
+        stdout: Optional[paramiko.ChannelFile],
+        stderr: Optional[paramiko.ChannelFile],
+    ) -> Tuple[str, str]:
+        """Attempt to recover any stdout/stderr already buffered before an exception."""
+        partial_stdout = ""
+        partial_stderr = ""
+
+        if stdout is not None and stdout.channel is not None:
+            try:
+                channel = stdout.channel
+                chunks = []
+                while channel.recv_ready():
+                    chunk = channel.recv(65536)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                if chunks:
+                    partial_stdout = b"".join(chunks).decode("utf-8", errors="replace")
+            except Exception:
+                pass
+
+        if stderr is not None and stderr.channel is not None:
+            try:
+                channel = stderr.channel
+                chunks = []
+                while channel.recv_stderr_ready():
+                    chunk = channel.recv_stderr(65536)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                if chunks:
+                    partial_stderr = b"".join(chunks).decode("utf-8", errors="replace")
+            except Exception:
+                pass
+
+        return partial_stdout, partial_stderr
+
     def run_command(self, command: str, *, client: Optional[paramiko.SSHClient] = None) -> Dict[str, object]:
         if client is None:
             client = self.connect()
+
+        start = time.perf_counter()
+        stdout: Optional[paramiko.ChannelFile] = None
+        stderr: Optional[paramiko.ChannelFile] = None
 
         try:
             stdin, stdout, stderr = client.exec_command(command, timeout=self.timeout)
@@ -232,16 +276,34 @@ class DeviceSSHClient:
             stdout_data = stdout.read().decode("utf-8", errors="replace")
             stderr_data = stderr.read().decode("utf-8", errors="replace")
             exit_code = stdout.channel.recv_exit_status()
-        except (socket.timeout, TimeoutError, EOFError, paramiko.ssh_exception.SSHException, OSError) as exc:
+        except (socket.timeout, TimeoutError) as exc:
+            elapsed = time.perf_counter() - start
+            partial_stdout, partial_stderr = self._read_partial_output(stdout, stderr)
             return {
                 "command": command,
-                "stdout": "",
-                "stderr": "",
+                "stdout": partial_stdout,
+                "stderr": partial_stderr,
                 "exit_code": -1,
                 "success": False,
                 "error": f"Command timed out or failed: {exc}",
+                "elapsed_seconds": elapsed,
+                "error_type": "timeout",
+            }
+        except (EOFError, paramiko.ssh_exception.SSHException, OSError) as exc:
+            elapsed = time.perf_counter() - start
+            partial_stdout, partial_stderr = self._read_partial_output(stdout, stderr)
+            return {
+                "command": command,
+                "stdout": partial_stdout,
+                "stderr": partial_stderr,
+                "exit_code": -1,
+                "success": False,
+                "error": f"Command timed out or failed: {exc}",
+                "elapsed_seconds": elapsed,
+                "error_type": "ssh_exception",
             }
 
+        elapsed = time.perf_counter() - start
         return {
             "command": command,
             "stdout": stdout_data,
@@ -249,6 +311,7 @@ class DeviceSSHClient:
             "exit_code": exit_code,
             "success": exit_code == 0,
             "error": stderr_data if exit_code != 0 else None,
+            "elapsed_seconds": elapsed,
         }
 
     def close(self, client: paramiko.SSHClient) -> None:

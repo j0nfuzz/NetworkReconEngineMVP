@@ -83,7 +83,7 @@ Changes:
 - Added tests for KEX diagnostic messages, peer KEX packet parsing, and legacy build argument handling.
 
 Reason:
-- Field testing observed paramiko IncompatiblePeer ("no acceptable kex algorithm") at 192.168.21.30; existing compatibility reordering only reorders Paramiko-supported algorithms and the embedded runtime bundle had no path to the legacy profile.
+- Field testing observed paramiko IncompatiblePeer ("no acceptable kex algorithm") at 192.0.2.30; existing compatibility reordering only reorders Paramiko-supported algorithms and the embedded runtime bundle had no path to the legacy profile.
 
 Risks Introduced:
 - Peer KEX probe performs an additional TCP handshake and may add latency on unreachable hosts.
@@ -94,7 +94,7 @@ Risks Resolved:
 - Portable embedded builds can target legacy SSH devices without replacing Paramiko.
 
 Next Recommended Action:
-- Field-test diagnostics against 192.168.21.30 and schedule GPT review of DD-006.
+- Field-test diagnostics against 192.0.2.30 and schedule GPT review of DD-006.
 
 ---
 
@@ -1849,4 +1849,53 @@ Risks Resolved:
 
 Next Recommended Action:
 - Repository owner reviews and executes the documented git filter-repo rewrite, validates the result, and force-pushes per the recorded plan.
+
+---
+
+Date: 2026-09-02
+Agent: GPT Reviewer
+
+Phase: PHASE-029-SSHLegacyKexPortableSupport
+
+Changes:
+- Recorded field observation: the no-argument interactive path reports a generated manifest but does not provide visible collection-stage progress or a conclusive SSH outcome in the resulting bundle.
+
+Reason:
+- The interactive path is intended to continue into normal collection after collecting the prompted inventory.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- None.
+
+Next Recommended Action:
+- Add a scoped follow-up phase to make interactive collection progress and terminal outcomes observable, then field-validate the legacy KEX profile.
+
+---
+
+Date: 2026-09-02
+Agent: Kimi
+
+Phase: PHASE-030-CommandCollectionTimeoutEvidence
+
+Changes:
+- app/ssh_client.py run_command() records elapsed_seconds on every result.
+- run_command() classifies failures as error_type "timeout" or "ssh_exception".
+- run_command() captures buffered stdout/stderr before an exception instead of discarding it.
+- app/collector.py exposes per-failed-command evidence via summary["failed_command_details"].
+- Added tests for success timing, timeout classification, SSH exception classification, partial-output preservation, and collector summary evidence.
+
+Reason:
+- Field collection reached status "partial" after successful KEX/auth; per-command timing, error classification, and partial output are required to diagnose the root cause before any timeout/profile fix.
+
+Risks Introduced:
+- Summary now includes a failed_command_details key; downstream consumers that assumed summary["failed_commands"] was the only failure record may need updating.
+- Partial output capture depends on Paramiko channel buffer state and may be incomplete for some failure modes.
+
+Risks Resolved:
+- Collection failures now provide actionable evidence (elapsed time, error type, partial output) for root-cause analysis.
+
+Next Recommended Action:
+- Field-test the instrumented build against the affected device and review summary.json evidence.
 

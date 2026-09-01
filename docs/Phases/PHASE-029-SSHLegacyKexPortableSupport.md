@@ -20,7 +20,7 @@ KNOWN RISKS:
 - Legacy paramiko/cryptography versions carry known-weak algorithms; must document security trade-off in HOWTO-PORTABLE.md scope note (doc change only if needed later).
 
 OUTSTANDING RISKS:
-- Whether 192.168.21.30 negotiates only via an algorithm legacy paramiko also lacks remains unconfirmed until diagnostics are field-tested (2026-09-01).
+- Whether 192.0.2.30 negotiates only via an algorithm legacy paramiko also lacks remains unconfirmed until diagnostics are field-tested (2026-09-01).
 
 OPEN QUESTIONS:
 - Should the embedded bundle ship both profiles side-by-side, or remain single-profile-per-build as today?
