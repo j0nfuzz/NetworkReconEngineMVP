@@ -11,6 +11,7 @@ from app.config import load_default_credentials, load_devices
 from app.detector import classify_role, identify_device
 from app.models import Device, DeviceIdentity
 from app.orchestrator import run_recursive_collection
+from app.scope import build_troubleshooting_scope
 from app.topology import build_topology_graph
 
 
@@ -23,6 +24,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--probe", action="store_true", help="Probe device(s), report reachability/legacy classification, then exit")
     parser.add_argument("--recursive", action="store_true", help="Collect recursively from the first configured device")
     parser.add_argument("--checkpoint-file", default=None, help="Path to JSON checkpoint file for resume/recursive runs")
+    parser.add_argument("--target-device", default=None, help="Limit recursive collection to this device and its direct topology neighbours")
+    parser.add_argument("--max-concurrent", type=int, default=5, help="Maximum simultaneous SSH sessions for scoped parallel collection")
     return parser.parse_args()
 
 
@@ -35,6 +38,8 @@ def _run_recursive_cli(
     *,
     checkpoint_file: str | None,
     dry_run: bool,
+    target_device: str | None,
+    max_concurrent: int = 5,
 ) -> None:
     """Run recursive collection from a seed device and populate bundle_summary."""
     default_credentials = load_default_credentials(config_path)
@@ -60,14 +65,40 @@ def _run_recursive_cli(
         if checkpoint_file:
             save_checkpoint(checkpoint_file, state)
 
-    result = run_recursive_collection(
-        seed_device,
-        default_credentials=default_credentials,
-        resume_state=resume_state,
-        on_collected=on_collected,
-    )
+    allowed_devices = None
+    if target_device:
+        topology_path = output_root / "topology.json"
+        if topology_path.exists():
+            topology = json.loads(topology_path.read_text(encoding="utf-8"))
+            scope = build_troubleshooting_scope(topology, target_device)
+        else:
+            scope = [target_device]
+        allowed_devices = set(scope)
+        log_verbose(f"[verbose] Limiting recursive collection to scope: {scope}")
 
-    for name, bundle in result["bundles"].items():
+    if allowed_devices is not None:
+        from app.parallel_collector import run_parallel_scoped_collection
+
+        result = run_parallel_scoped_collection(
+            seed_device,
+            default_credentials=default_credentials,
+            resume_state=resume_state,
+            on_collected=on_collected,
+            allowed_devices=allowed_devices,
+            max_concurrent=max_concurrent,
+        )
+        bundle_items = sorted(result["bundles"].items(), key=lambda item: item[0])
+    else:
+        result = run_recursive_collection(
+            seed_device,
+            default_credentials=default_credentials,
+            resume_state=resume_state,
+            on_collected=on_collected,
+            allowed_devices=allowed_devices,
+        )
+        bundle_items = result["bundles"].items()
+
+    for name, bundle in bundle_items:
         log_verbose(f"[verbose] Finished collection for {name}: {bundle.summary.get('status')}")
         device_dir = write_bundle(bundle, output_root)
         bundle_summary["devices"].append({
@@ -154,14 +185,24 @@ def main() -> int:
             print(message)
 
     if args.recursive and devices:
+        if args.target_device:
+            target_matches = [d for d in devices if d.name == args.target_device]
+            if not target_matches:
+                print(f"Unknown target device '{args.target_device}' not found in config.")
+                return 1
+            seed_device = target_matches[0]
+        else:
+            seed_device = devices[0]
         _run_recursive_cli(
-            devices[0],
+            seed_device,
             args.config,
             output_root,
             bundle_summary,
             log_verbose,
             checkpoint_file=args.checkpoint_file,
             dry_run=args.dry_run,
+            target_device=args.target_device,
+            max_concurrent=args.max_concurrent,
         )
     else:
         for device in devices:

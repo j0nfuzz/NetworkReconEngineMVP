@@ -1318,3 +1318,156 @@ Risks Resolved:
 
 Next Recommended Action:
 - Re-review PHASE-016A and approve DD-004.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-016B-BootstrapRestoration
+
+Changes:
+- Restored interactive_bootstrap.ps1 and tests/test_bootstrap.ps1 from commit a49e5e6 (parent of deletion commit d2bf269).
+- Verified the restored files already contain the PHASE-016A remediation changes (pyvenv.cfg home validation, venv python exit-code check, discovery precedence tests).
+- Created docs/Phases/IMPLEMENTED-PHASE-016B-BootstrapRestoration.md.
+
+Reason:
+- Commit d2bf269 deleted the bootstrap script and its tests; documentation and README/HOWTO references still pointed to them, so the repository was internally inconsistent and the PHASE-016A implementation was unreviewable.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Repository no longer references a non-existent bootstrap entry point.
+- PHASE-016A implementation and DD-004 intent are present and testable again.
+
+Next Recommended Action:
+- Re-review PHASE-016A and proceed to DD-004 approval.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-017-TopologyAwareTroubleshootingScope
+
+Changes:
+- Added app/scope.py with build_troubleshooting_scope() returning a deterministic single-hop scope from topology.json.
+- Added --target-device CLI flag; when supplied, recursive collection is limited to the target and its direct neighbours.
+- Added optional allowed_devices parameter to app/orchestrator.py run_recursive_collection() to enforce the scope during neighbour enqueueing.
+- Added tests/test_scope.py covering neighbour inclusion, unknown target, no neighbours, deterministic ordering, empty neighbour names, and CLI scope behaviour.
+
+Reason:
+- Implements PHASE-017 acceptance criteria using existing topology/traversal structures and no new dependencies.
+
+Risks Introduced:
+- Single-hop scope may omit devices needed for full root-cause context.
+
+Risks Resolved:
+- Recursive collection can now be bounded to a target device's fault domain.
+
+Next Recommended Action:
+- Review PHASE-017-TopologyAwareTroubleshootingScope.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-017A-TopologyAwareTroubleshootingScopeRemediation
+
+Changes:
+- app/cli.py now resolves --target-device to its matching configured device as the recursive seed, returning error code 1 for unknown targets.
+- app/orchestrator.py now filters resumed checkpoint pending entries against allowed_devices before enqueueing them.
+- Added tests covering non-first seed selection, unknown target failure, and resumed pending scope filtering.
+
+Reason:
+- GPT Reviewer identified two correctness defects in PHASE-017: seed selection ignored --target-device and checkpoint pending entries bypassed the scope filter.
+
+Risks Introduced:
+- None beyond existing PHASE-017 accepted risks.
+
+Risks Resolved:
+- Non-first target devices are correctly selected as the recursive seed.
+- Resumed checkpoints cannot expand scoped collection beyond the target and its direct neighbours.
+
+Next Recommended Action:
+- Re-review PHASE-017 and PHASE-017A.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-017B-TopologyAwareTroubleshootingScopeCheckpointRemediation
+
+Changes:
+- app/orchestrator.py now initializes queued from the filtered pending list when allowed_devices is active, so emitted checkpoints no longer include out-of-scope pending entries.
+- Updated test_allowed_devices_filters_resumed_pending_entries to assert emitted checkpoint state excludes out-of-scope entries.
+
+Reason:
+- GPT Reviewer found that although collection was scoped, the queued set retained unfiltered checkpoint entries and wrote them back into emitted resume state.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Out-of-scope pending entries no longer persist across scoped checkpoint resumes.
+
+Next Recommended Action:
+- Re-review PHASE-017 through PHASE-017B.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-018-ParallelScopedCollection
+
+Changes:
+- Added app/parallel_collector.py with bounded async collection using asyncssh; activates only when allowed_devices scope is provided.
+- Added --max-concurrent CLI flag (default 5) and wired scoped recursive runs to the parallel collector while leaving unscoped runs on the existing sequential orchestrator.
+- Sorted parallel bundle output by device name so bundle_manifest.json is deterministic regardless of completion order.
+- Preserved checkpoint/resume semantics and PHASE-017 scope filtering in the parallel path.
+- Added tests/test_parallel_collector.py covering concurrent scoped execution, sequential unscoped fallback, deterministic ordering, unchanged checkpoint behaviour, and max-concurrent bounding.
+- Added asyncssh to requirements.txt and proposed DD-005 for reviewer approval.
+- Updated tests/test_scope.py CLI mocks to target the new parallel collector for target-device scenarios.
+
+Reason:
+- Implements Wishlist Phase 9 (Parallel Collection) in a narrow, scope-safe form: concurrency is only used under --target-device, avoiding estate-wide blast radius while satisfying the acceptance criteria.
+
+Risks Introduced:
+- New asyncssh dependency surface (security/maintenance) pending DDR approval.
+- Concurrent sessions could stress AAA if --max-concurrent is set high.
+
+Risks Resolved:
+- Scoped collection no longer forced to run sequentially for multi-device fault domains.
+
+Next Recommended Action:
+- GPT Reviewer to approve or reject DD-005 and review PHASE-018 implementation.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-018A-ParallelScopedCollectionRemediation
+
+Changes:
+- app/parallel_collector.py now normalizes max_concurrent to at least 1, preventing hangs from --max-concurrent 0 or negative values.
+- app/parallel_collector.py now caps each wave to remaining max_devices capacity, preserving traversal limits.
+- Added parametrized test for max_concurrent 0, -1, and -5.
+- Added test verifying a final wave respects max_devices boundary.
+
+Reason:
+- Address the two critical issues identified in REVIEW-PHASE-018: non-positive max_concurrent could stall collection, and waves could exceed max_devices.
+
+Risks Introduced:
+- None beyond existing PHASE-018 accepted risks.
+
+Risks Resolved:
+- Scoped parallel collection no longer hangs on invalid max_concurrent values.
+- max_devices semantics are preserved under parallel execution.
+
+Next Recommended Action:
+- Re-review PHASE-018 and PHASE-018A.

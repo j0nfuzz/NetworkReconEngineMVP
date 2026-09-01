@@ -195,3 +195,56 @@ def test_duplicate_neighbor_not_queued_multiple_times(monkeypatch):
     result = run_recursive_collection(seed)
     assert result["successful"] == ["SW01", "SW02", "SW03"]
     assert [d.name for d in collector.calls] == ["SW01", "SW02", "SW03"]
+
+
+def test_allowed_devices_filters_resumed_pending_entries(monkeypatch):
+    seed = Device(name="SW01", hostname="10.0.0.1", vendor="cisco")
+    collector = _FakeCollector({
+        "SW01": _make_bundle("SW01", "cisco", "collected", []),
+        "SW02": _make_bundle("SW02", "cisco", "collected", []),
+        "SW03": _make_bundle("SW03", "cisco", "collected", []),
+    })
+    monkeypatch.setattr("app.orchestrator.execute_device_collection", collector)
+
+    resume_state = {
+        "visited": [],
+        "pending": ["SW02", "SW03"],
+        "successful": [],
+        "failed": [],
+        "unsupported": [],
+    }
+
+    emitted = []
+    result = run_recursive_collection(
+        seed,
+        resume_state=resume_state,
+        allowed_devices={"SW01", "SW02"},
+        on_collected=emitted.append,
+    )
+    assert result["successful"] == ["SW02", "SW01"]
+    assert "SW03" not in result["bundles"]
+    assert not any(d.name == "SW03" for d in collector.calls)
+    for state in emitted:
+        assert "SW03" not in state["pending"]
+
+
+def test_allowed_devices_none_preserves_all_resumed_pending_entries(monkeypatch):
+    seed = Device(name="SW01", hostname="10.0.0.1", vendor="cisco")
+    collector = _FakeCollector({
+        "SW01": _make_bundle("SW01", "cisco", "collected", []),
+        "SW02": _make_bundle("SW02", "cisco", "collected", []),
+    })
+    monkeypatch.setattr("app.orchestrator.execute_device_collection", collector)
+
+    resume_state = {
+        "visited": [],
+        "pending": ["SW02"],
+        "successful": [],
+        "failed": [],
+        "unsupported": [],
+    }
+
+    result = run_recursive_collection(seed, resume_state=resume_state)
+    assert result["successful"] == ["SW02", "SW01"]
+    assert "SW02" in result["bundles"]
+

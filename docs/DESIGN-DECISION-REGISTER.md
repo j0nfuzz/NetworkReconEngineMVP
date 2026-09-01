@@ -200,12 +200,35 @@ Reason:
 Copied or synced .venv directories retain machine-specific interpreter references; folder-existence checks alone cause silent bootstrap failure on other workstations.
 
 Status:
-Proposed
+Approved
 
 Approver:
+GPT Reviewer
 
 Date:
 2026-08-05
 
 Phase:
 PHASE-016-BootstrapEnvironmentPortability
+
+---
+
+Decision ID: DD-005
+
+Decision:
+Add asyncssh as a project dependency to enable bounded concurrent SSH collection when `--target-device` scoping is active.
+
+Reason:
+Scoped parallel collection (PHASE-018) requires async concurrency; asyncssh provides an asyncio-native SSH client suitable for small, deterministic device sets.
+
+Status:
+Approved
+
+Approver:
+GPT Reviewer
+
+Date:
+2026-09-01
+
+Phase:
+PHASE-018-ParallelScopedCollection

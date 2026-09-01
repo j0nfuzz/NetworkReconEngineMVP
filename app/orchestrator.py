@@ -42,20 +42,22 @@ def run_recursive_collection(
     max_devices: int = 100,
     on_collected: Any = None,
     resume_state: Optional[Dict[str, Any]] = None,
+    allowed_devices: Optional[set[str]] = None,
 ) -> Dict[str, Any]:
     """Collect from a seed device, then recursively collect from supported neighbors."""
     defaults = default_credentials or {}
     resume = resume_state or {}
     visited: set[str] = set(resume.get("visited", []))
-    queued: set[str] = set(resume.get("pending", []))
     successful: List[str] = list(resume.get("successful", []))
     failed: List[str] = list(resume.get("failed", []))
     unsupported: List[str] = list(resume.get("unsupported", []))
     bundles: Dict[str, DeviceBundle] = {}
 
-    pending_devices = _reconstruct_pending_devices(
-        list(resume.get("pending", [])), [], defaults
-    )
+    pending_names = list(resume.get("pending", []))
+    if allowed_devices is not None:
+        pending_names = [name for name in pending_names if name in allowed_devices]
+    queued: set[str] = set(pending_names)
+    pending_devices = _reconstruct_pending_devices(pending_names, [], defaults)
     queue: deque[Device] = deque(pending_devices)
     if seed_device.name not in visited:
         queue.append(seed_device)
@@ -98,6 +100,8 @@ def run_recursive_collection(
         for record in discovered:
             neighbor_name = record.get("neighbor")
             if not neighbor_name or neighbor_name in visited or neighbor_name in queued:
+                continue
+            if allowed_devices is not None and neighbor_name not in allowed_devices:
                 continue
 
             classification = classifications.get(neighbor_name, "unknown")
