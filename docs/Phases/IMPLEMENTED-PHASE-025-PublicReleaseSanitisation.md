@@ -35,7 +35,7 @@ FILES ADDED:
 - docs/Phases/IMPLEMENTED-PHASE-025-PublicReleaseSanitisation.md
 
 VALIDATION EVIDENCE:
-- git grep -i "sapphire": no matches (tracked content clean).
+- Tenant-identifier scan: no matches (tracked content clean).
 - git grep -i "example-employer": no matches (tracked content clean).
 - git grep -i "<USERNAME>": no matches (tracked content clean).
 - NetworkDeviceDiagnostics.spec Analysis path is now ['run_portable.py'] with no local user path.

@@ -13,7 +13,7 @@ NetworkDeviceDiagnostics.spec
 .gitignore
 
 ACCEPTANCE CRITERIA:
-- No occurrence of "Sapphire" remains anywhere in tracked files; replaced with a neutral placeholder (e.g., "`<CUSTOMER>`") preserving the technical meaning of the field-test evidence.
+- No occurrence of the former tenant identifier remains anywhere in tracked files; replaced with a neutral placeholder (e.g., "`<CUSTOMER>`") preserving the technical meaning of the field-test evidence.
 - NetworkDeviceDiagnostics.spec contains no employer name, personal name, or absolute local user path.
 - NetworkRecon.zip and test_bootstrap/ are removed from git tracking (git rm --cached) and added to .gitignore.
 - Existing 146 tests continue to pass; no application logic changed.

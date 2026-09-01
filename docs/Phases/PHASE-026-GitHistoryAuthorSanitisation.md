@@ -21,7 +21,7 @@ KNOWN RISKS:
 - Force-push to a public remote is a destructive, hard-to-reverse action against the published history; must be explicitly confirmed by the repository owner before execution.
 
 OUTSTANDING RISKS:
-- File-content blockers ("Sapphire", NetworkDeviceDiagnostics.spec local path, tracked ZIP artefacts) remain open until PHASE-025 is implemented; recommend implementing PHASE-025 first and rewriting history once, after both content and authorship fixes are ready, to avoid a second force-push.
+- File-content blockers (former tenant identifier, NetworkDeviceDiagnostics.spec local path, tracked ZIP artefacts) remain open until PHASE-025 is implemented; recommend implementing PHASE-025 first and rewriting history once, after both content and authorship fixes are ready, to avoid a second force-push.
 
 OPEN QUESTIONS:
 - Confirm the repository owner accepts commit-hash change and force-push as an acceptable one-time disruption to the public history before this phase is executed.

@@ -7,13 +7,13 @@ Not Approved
 CRITICAL ISSUES:
 
 Issue:
-Tracked `.mailmap` and PHASE-026 records contain the former employer-identifiable email address.
+Tracked phase records still contain the former tenant identifier.
 
 Why It Matters:
-Publishing the repository would directly disclose the identity that the history rewrite was intended to remove.
+PHASE-025 explicitly requires no occurrence of the former tenant identifier in tracked files; the supplied no-match validation is contradicted by the current index.
 
 Recommended Fix:
-Remove or redact the old identity from tracked files while retaining a non-identifying description of the sanitisation process, then re-run tracked-content and history validation.
+Replace the remaining identifier mentions in the tracked phase records with neutral wording, then repeat the tracked-content scan.
 
 MAJOR ISSUES:
 
@@ -25,7 +25,7 @@ UNCHANGED DD:DD-005
 
 OUTSTANDING RISKS:
 
-- Current tracked content exposes the former employer email.
+- Tracked phase records disclose the former tenant identifier.
 
 OPEN QUESTIONS:
 
@@ -33,4 +33,4 @@ None
 
 RECOMMENDED NEXT PHASE:
 
-PublicReleaseMetadataSanitisation
+PublicReleaseContentSanitisationRemediation
