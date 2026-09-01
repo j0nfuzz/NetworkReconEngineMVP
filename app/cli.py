@@ -25,7 +25,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--recursive", action="store_true", help="Collect recursively from the first configured device")
     parser.add_argument("--checkpoint-file", default=None, help="Path to JSON checkpoint file for resume/recursive runs")
     parser.add_argument("--target-device", default=None, help="Limit recursive collection to this device and its direct topology neighbours")
-    parser.add_argument("--max-concurrent", type=int, default=5, help="Maximum simultaneous SSH sessions for scoped parallel collection")
+    parser.add_argument(
+        "--max-concurrent",
+        type=int,
+        default=5,
+        help="Maximum simultaneous SSH sessions for scoped parallel collection (1-10, default 5)",
+    )
     return parser.parse_args()
 
 

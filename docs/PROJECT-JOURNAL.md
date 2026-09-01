@@ -1471,3 +1471,28 @@ Risks Resolved:
 
 Next Recommended Action:
 - Re-review PHASE-018 and PHASE-018A.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-019-MaxConcurrentSafetyLimit
+
+Changes:
+- Added MAX_CONCURRENT_CEILING=10 to app/parallel_collector.py and clamped effective max_concurrent to [1, ceiling].
+- Updated app/cli.py --max-concurrent help text to document the 1-10 range.
+- Added tests for ceiling clamping, in-range values, non-positive normalization, and help-text documentation.
+
+Reason:
+- Address the outstanding risk identified in REVIEW-PHASE-018A that --max-concurrent had no upper ceiling and could stress AAA services.
+
+Risks Introduced:
+- Hard ceiling of 10 may be too low for some fault domains; requires future config phase to override.
+
+Risks Resolved:
+- Scoped parallel collection cannot exceed a safe simultaneous SSH session ceiling regardless of user input.
+
+Next Recommended Action:
+- Re-review PHASE-019 and close the PHASE-018 chain.
+

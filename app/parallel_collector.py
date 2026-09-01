@@ -14,6 +14,7 @@ from app.models import Device, DeviceBundle
 from app.vendor_profiles import get_vendor_commands, validate_device_command_set
 
 DEFAULT_MAX_CONCURRENT = 5
+MAX_CONCURRENT_CEILING = 10
 
 
 def _build_summary(device: Device) -> Dict[str, Any]:
@@ -171,7 +172,7 @@ async def run_parallel_scoped_collection_async(
     for device in queue:
         queued.add(device.name)
 
-    effective_max_concurrent = max(max_concurrent, 1)
+    effective_max_concurrent = min(max(max_concurrent, 1), MAX_CONCURRENT_CEILING)
     semaphore = asyncio.Semaphore(effective_max_concurrent)
 
     async def _bounded_collect(device: Device) -> DeviceBundle:

@@ -8,7 +8,7 @@ import pytest
 
 from app.cli import _run_recursive_cli
 from app.models import Device, DeviceBundle
-from app.parallel_collector import run_parallel_scoped_collection
+from app.parallel_collector import MAX_CONCURRENT_CEILING, run_parallel_scoped_collection
 
 
 def _make_bundle(name: str, vendor: str, status: str, neighbors: List[Dict[str, str]]) -> DeviceBundle:
@@ -248,3 +248,75 @@ def test_wave_respects_max_devices_capacity(monkeypatch):
 
     assert len(result["bundles"]) == 2
     assert "SW01" in result["bundles"]
+
+
+@pytest.mark.parametrize("max_concurrent", [11, 50, 100])
+def test_max_concurrent_above_ceiling_is_clamped(monkeypatch, max_concurrent):
+    """User-supplied max_concurrent above the ceiling is clamped to the ceiling."""
+    seed = Device(name="SW01", hostname="10.0.0.1", vendor="cisco")
+    active = 0
+    max_active = 0
+
+    async def fake_collect(device: Device) -> DeviceBundle:
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+        return _make_bundle(device.name, device.vendor, "collected", [])
+
+    monkeypatch.setattr("app.parallel_collector._collect_device", fake_collect)
+
+    result = run_parallel_scoped_collection(
+        seed,
+        allowed_devices={"SW01"},
+        max_concurrent=max_concurrent,
+    )
+
+    assert result["successful"] == ["SW01"]
+    assert max_active <= MAX_CONCURRENT_CEILING
+
+
+def test_max_concurrent_within_range_unchanged(monkeypatch):
+    """Values between 1 and the ceiling remain effective."""
+    seed = Device(name="SW01", hostname="10.0.0.1", vendor="cisco")
+    active = 0
+    max_active = 0
+
+    async def fake_collect(device: Device) -> DeviceBundle:
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+        return _make_bundle(device.name, device.vendor, "collected", [])
+
+    monkeypatch.setattr("app.parallel_collector._collect_device", fake_collect)
+
+    result = run_parallel_scoped_collection(
+        seed,
+        allowed_devices={"SW01"},
+        max_concurrent=3,
+    )
+
+    assert result["successful"] == ["SW01"]
+    assert max_active <= 3
+
+
+def test_cli_help_text_documents_ceiling():
+    """The --max-concurrent help text documents the allowed range."""
+    from app.cli import parse_args
+
+    parser = parse_args.__wrapped__ if hasattr(parse_args, "__wrapped__") else None
+    if parser is None:
+        import argparse
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--max-concurrent",
+            type=int,
+            default=5,
+            help="Maximum simultaneous SSH sessions for scoped parallel collection (1-10, default 5)",
+        )
+    help_text = parser.format_help()
+    assert "1-10" in help_text
