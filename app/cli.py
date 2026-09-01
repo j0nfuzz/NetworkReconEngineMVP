@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
+
+import yaml
 
 from app.checkpoint import load_checkpoint, save_checkpoint
 from app.collector import execute_device_collection, write_bundle
@@ -15,9 +20,48 @@ from app.scope import build_troubleshooting_scope
 from app.topology import build_topology_graph
 
 
+def _prompt_interactive_inventory() -> Path:
+    """Prompt for device details and write a temporary runtime inventory YAML."""
+    print("No device inventory provided. Enter the target device details.")
+    hostname = input("Hostname or IP: ").strip()
+    while not hostname:
+        hostname = input("Hostname or IP: ").strip()
+    username = input("Username: ").strip()
+    while not username:
+        username = input("Username: ").strip()
+    password = getpass.getpass("Password: ")
+    port_input = input("SSH port [22]: ").strip()
+    port = int(port_input) if port_input else 22
+    vendor = input("Vendor [auto]: ").strip() or "auto"
+    name = hostname
+
+    payload = {
+        "devices": [
+            {
+                "name": name,
+                "hostname": hostname,
+                "vendor": vendor,
+                "port": port,
+                "username": username,
+                "password": password,
+            }
+        ]
+    }
+
+    fd, runtime_path = tempfile.mkstemp(suffix=".yml", prefix="interactive_devices_")
+    runtime_path = Path(runtime_path)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            yaml.safe_dump(payload, f)
+    except Exception:
+        runtime_path.unlink(missing_ok=True)
+        raise
+    return runtime_path
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect network device diagnostics over SSH.")
-    parser.add_argument("--config", required=True, help="Path to YAML device inventory")
+    parser.add_argument("--config", default=None, help="Path to YAML device inventory; if omitted, interactive prompts are used")
     parser.add_argument("--output-dir", default="output", help="Directory for generated bundle")
     parser.add_argument("--dry-run", action="store_true", help="Validate configuration without trying SSH")
     parser.add_argument("--verbose", action="store_true", help="Print detailed SSH and collection diagnostics")
@@ -165,18 +209,14 @@ def probe_devices(devices: List[Device]) -> List[Dict[str, object]]:
     return results
 
 
-def main() -> int:
-    args = parse_args()
-    verbose = args.verbose
-    devices_data = load_devices(args.config)
-    devices = [Device.from_dict(item) for item in devices_data]
-
-    if args.probe:
-        results = probe_devices(devices)
-        print(json.dumps(results, indent=2))
-        return 0
-
-    output_root = Path(args.output_dir)
+def _run_cli_collection(
+    args: argparse.Namespace,
+    devices: List[Device],
+    config_path: str,
+    output_root: Path,
+    verbose: bool,
+) -> int:
+    """Run collection for parsed devices and write artefacts."""
     output_root.mkdir(parents=True, exist_ok=True)
 
     bundle_summary: Dict[str, Any] = {
@@ -200,7 +240,7 @@ def main() -> int:
             seed_device = devices[0]
         _run_recursive_cli(
             seed_device,
-            args.config,
+            config_path,
             output_root,
             bundle_summary,
             log_verbose,
@@ -285,6 +325,41 @@ def main() -> int:
 
     print(f"Generated bundle manifest: {manifest_path}")
     return 0
+
+
+def main() -> int:
+    args = parse_args()
+    verbose = args.verbose
+    output_root = Path(args.output_dir)
+
+    interactive_config_path: Path | None = None
+    config_path = args.config
+    if config_path is None:
+        interactive_config_path = _prompt_interactive_inventory()
+        config_path = str(interactive_config_path)
+
+    try:
+        devices_data = load_devices(config_path)
+        devices = [Device.from_dict(item) for item in devices_data]
+
+        if args.probe:
+            results = probe_devices(devices)
+            print(json.dumps(results, indent=2))
+            return 0
+
+        return _run_cli_collection(
+            args=args,
+            devices=devices,
+            config_path=config_path,
+            output_root=output_root,
+            verbose=verbose,
+        )
+    finally:
+        if interactive_config_path is not None and interactive_config_path.exists():
+            try:
+                interactive_config_path.unlink()
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":

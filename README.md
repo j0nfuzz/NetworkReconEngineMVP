@@ -37,7 +37,31 @@ This tool is intentionally read-only.
 
 ## Quick start
 
-### Option 1: interactive bootstrap (recommended)
+### Option 1: interactive launch (no inventory file required)
+
+The CLI can prompt for everything needed for a single-device collection. Omit `--config` and enter the target details when asked:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.cli --output-dir output --verbose
+```
+
+You will be prompted for:
+
+- Hostname or IP
+- Username
+- Password (hidden)
+- SSH port (defaults to `22`)
+- Vendor (defaults to `auto`)
+
+The CLI writes the entered details to a temporary runtime YAML in the system temp directory, then runs the normal collection path and deletes the file. Existing `--config` workflows are unchanged.
+
+The packaged executable supports the same prompt-based launch:
+
+```powershell
+.\NetworkDeviceDiagnostics.exe --output-dir output --verbose
+```
+
+### Option 2: interactive bootstrap (PowerShell)
 
 From the project root:
 
@@ -62,7 +86,7 @@ You can also skip the dependency reinstall step on repeat runs:
 .\interactive_bootstrap.ps1 -SkipInstall
 ```
 
-### Option 2: direct CLI run
+### Option 3: direct CLI run with an inventory file
 
 Create or update `config/devices.yml`:
 
@@ -213,7 +237,21 @@ Build the executable from the project root:
 .\.venv\Scripts\python.exe -m build_portable
 ```
 
-The build produces `dist\NetworkDeviceDiagnostics.zip`, a single archive containing `NetworkDeviceDiagnostics.exe` and its bundled dependencies. Extract the archive on the target workstation and run the executable with the same arguments as the Python CLI:
+The build produces `dist\NetworkDeviceDiagnostics.zip`, a single archive containing `NetworkDeviceDiagnostics.exe` and its bundled dependencies. Extract the archive on the target workstation and run the executable with the same arguments as the Python CLI.
+
+### Interactive packaged launch
+
+If you do not have a prepared inventory, launch the executable without `--config` and enter the device details at the prompts:
+
+```powershell
+.\NetworkDeviceDiagnostics.exe --output-dir output --verbose
+```
+
+The executable will prompt for hostname/IP, username, hidden password, SSH port (default `22`), and vendor (default `auto`), then write a temporary runtime YAML and continue with collection.
+
+### Packaged launch with an existing inventory
+
+If you already have an inventory file, use the same `--config` path as the source CLI:
 
 ```powershell
 .\NetworkDeviceDiagnostics.exe --config config\devices.yml --output-dir output

@@ -163,7 +163,35 @@ The result is written to:
 dist\NetworkDeviceDiagnostics.zip
 ```
 
-Extract the zip on a target workstation. It does not require Python, Git, or a virtual environment. Run the executable with the same arguments as the Python CLI:
+Extract the zip on a target workstation. It does not require Python, Git, or a virtual environment.
+
+### Interactive packaged launch
+
+For the simplest technician workflow, launch the executable without `--config`:
+
+```powershell
+.\NetworkDeviceDiagnostics.exe --output-dir output --verbose
+```
+
+The tool prompts for:
+
+1. Hostname or IP
+2. Username
+3. Password (characters are hidden)
+4. SSH port (press Enter to accept `22`)
+5. Vendor (press Enter to accept `auto`)
+
+It writes the answers to a temporary runtime YAML in the system temp directory, then runs the normal collection path and deletes the file. No inventory file needs to be created beforehand.
+
+For a dry-run validation without connecting:
+
+```powershell
+.\NetworkDeviceDiagnostics.exe --output-dir demo_output --dry-run
+```
+
+### Packaged launch with an existing inventory
+
+If you already have a device inventory, pass `--config` as usual:
 
 ```powershell
 .\NetworkDeviceDiagnostics.exe --config config\devices.yml --output-dir output --verbose
@@ -175,7 +203,7 @@ For a recursive run with a checkpoint file:
 .\NetworkDeviceDiagnostics.exe --config config\devices.yml --output-dir output --recursive --checkpoint-file output\checkpoint.json --verbose
 ```
 
-The packaged executable bundles the same dependencies and command profiles used by the source workflow. Distributing it requires placing the extracted `NetworkDeviceDiagnostics` folder, a valid `config\devices.yml`, and an output location on the target workstation.
+The packaged executable bundles the same dependencies and command profiles used by the source workflow. Distributing the interactive workflow only requires placing the extracted `NetworkDeviceDiagnostics` folder and an output location on the target workstation; distributing the `--config` workflow also requires a valid `config\devices.yml`.
 
 Some endpoint protection products may quarantine or delete unsigned executables. If the executable is removed after copying, restore it from the endpoint protection quarantine or build the package directly on the target workstation.
 

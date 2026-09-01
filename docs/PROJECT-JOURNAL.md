@@ -1618,3 +1618,137 @@ Risks Resolved:
 Next Recommended Action:
 - Re-review PHASE-021 remediation chain and approve or reject.
 
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-022-EngineerLaunchExperience
+
+Changes:
+- Made --config optional in app/cli.py.
+- Added _prompt_interactive_inventory() to prompt for hostname/IP, username, hidden password, port (default 22), and vendor (default auto).
+- When --config is omitted, the CLI writes output_dir/interactive_devices.yml and passes it to the existing load_devices() / collection path.
+- Updated README.md and docs/HOWTO-PORTABLE.md to document the extract -> launch -> enter details -> collect workflow.
+- Added four tests covering optional --config, valid runtime YAML, default port/vendor, and hidden password entry.
+
+Reason:
+- Phase file required removing the inventory-authoring prerequisite for packaged and source launches while keeping --config workflows intact.
+
+Risks Introduced:
+- Interactive prompts may not work in non-TTY environments; automated use should still use --config.
+- Temporary runtime YAML is written to the output directory and must not be distributed.
+- getpass may fall back to plain input in unusual console environments, although standard Windows/PyInstaller consoles hide input.
+
+Risks Resolved:
+- Engineers can launch the packaged or source CLI without creating a YAML inventory first.
+
+Next Recommended Action:
+- GPT review of PHASE-022; no collection/traversal/checkpoint/topology/health/bootstrap changes were made.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-022A-EngineerLaunchExperienceRemediation
+
+Changes:
+- Switched build_portable.py to console mode by removing --noconsole.
+- Updated _prompt_interactive_inventory() to write a secure temporary file via tempfile.mkstemp() instead of output_dir/interactive_devices.yml.
+- Wrapped main() load_devices/collection in try/finally so the temp inventory is deleted on success, dry-run, and exception paths.
+- Updated tests to reflect zero-argument prompt helper and added cleanup tests for success, exception, and dry-run paths.
+- Updated README.md and docs/HOWTO-PORTABLE.md to describe the secure temp-file behavior.
+
+Reason:
+- REVIEW-PHASE-022 found the packaged --noconsole build could not prompt and the runtime YAML persisted plaintext credentials.
+
+Risks Introduced:
+- Console window is visible when launching the packaged executable; acceptable tradeoff for interactive input.
+- Non-TTY environments still cannot use interactive prompts; use --config for automation.
+
+Risks Resolved:
+- Packaged interactive launch now has an attached console for input()/getpass().
+- Plaintext credentials are no longer retained in the output directory.
+
+Next Recommended Action:
+- GPT review of PHASE-022A.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-022B-EngineerLaunchExperienceCredentialCleanupRemediation
+
+Changes:
+- Fixed _prompt_interactive_inventory() exception path in app/cli.py so yaml.safe_dump() failures delete the temp file and re-raise the original exception.
+- Replaced os.close(fd) + bare raise with runtime_path.unlink(missing_ok=True) guarded by a defensive try/except OSError, then raise.
+- Converted runtime_path to Path immediately after mkstemp() so cleanup targets the correct file.
+- Removed double-close risk by letting os.fdopen() context manager own the fd.
+- Added tests/test_cli.py::test_prompt_interactive_inventory_unlinks_file_on_yaml_failure.
+
+Reason:
+- REVIEW-PHASE-022A identified that a yaml.safe_dump() failure after mkstemp() could leave plaintext credentials in the temp file and that the exception handler called os.close() on an fd already closed by os.fdopen().
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Temp file is unlinked if YAML serialization fails.
+- Original exception propagates without suppression or replacement.
+- No double-close on the mkstemp() fd.
+
+Next Recommended Action:
+- GPT review of PHASE-022B.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-022C-EngineerLaunchExperienceCredentialCleanupFinalRemediation
+
+Changes:
+- Removed the inner try/except OSError around runtime_path.unlink() in app/cli.py _prompt_interactive_inventory() so cleanup failures propagate.
+- Original yaml.safe_dump() exception still propagates when cleanup succeeds.
+- Added tests/test_cli.py::test_prompt_interactive_inventory_propagates_unlink_failure.
+
+Reason:
+- REVIEW-PHASE-022B required temp-file cleanup failures to be observable rather than silently suppressed.
+
+Risks Introduced:
+- None beyond existing accepted PoC risks.
+
+Risks Resolved:
+- Plaintext credential temp file deletion failures are no longer hidden.
+- Cleanup failure is observable while preserving original exception propagation on successful cleanup.
+
+Next Recommended Action:
+- GPT review of PHASE-022C.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-022D-EngineerLaunchExperienceCredentialCleanupTestRemediation
+
+Changes:
+- Refactored tests/test_cli.py::test_prompt_interactive_inventory_propagates_unlink_failure to mock tempfile.mkstemp() so no real temp inventory file is created.
+- Preserved the OSError propagation assertion.
+- Confirmed no interactive_devices_*.yml files remain after repeated test runs.
+
+Reason:
+- REVIEW-PHASE-022C found the unlink-failure test left a real temp file behind, causing subsequent test runs to fail.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Unlink-failure regression test no longer leaks temp inventory files.
+- tests/test_cli.py suite passes reproducibly with 64 tests.
+
+Next Recommended Action:
+- GPT review of PHASE-022D.
+

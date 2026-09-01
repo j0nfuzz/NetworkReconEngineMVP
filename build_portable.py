@@ -30,7 +30,6 @@ def main() -> int:
         "--name",
         "NetworkDeviceDiagnostics",
         "--onedir",
-        "--noconsole",
         "--distpath",
         str(dist_dir),
         "--workpath",

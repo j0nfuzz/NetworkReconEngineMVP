@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import zipfile
 from pathlib import Path
 
 import paramiko
+import pytest
+import yaml
 
 import app.collector as collector_module
-from app.cli import parse_args, probe_devices, _is_legacy_error, _run_recursive_cli
+from app.cli import parse_args, probe_devices, _is_legacy_error, _run_recursive_cli, _prompt_interactive_inventory
 from app.collector import execute_device_collection, write_bundle
 from app.classification import classify_neighbor_support, classify_neighbors
 from app.detector import detect_vendor_from_show_version
@@ -46,6 +49,13 @@ def test_parse_args_supports_recursive_and_checkpoint_file(monkeypatch):
     args = parse_args()
     assert args.recursive is True
     assert args.checkpoint_file == "checkpoint.json"
+
+
+def test_parse_args_config_is_optional(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["prog", "--output-dir", "output"])
+    args = parse_args()
+    assert args.config is None
+    assert args.output_dir == "output"
 
 
 def test_vendor_profile_cisco():
@@ -583,6 +593,7 @@ def test_recursive_cli_invokes_orchestrator(monkeypatch, tmp_path):
         max_devices=100,
         on_collected=None,
         resume_state=None,
+        **kwargs,
     ):
         captured["seed"] = seed_device
         captured["default_credentials"] = default_credentials
@@ -648,6 +659,7 @@ def test_recursive_cli_creates_checkpoint_file(monkeypatch, tmp_path):
         max_devices=100,
         on_collected=None,
         resume_state=None,
+        **kwargs,
     ):
         # Simulate orchestrator emitting a checkpoint.
         if callable(on_collected):
@@ -727,6 +739,7 @@ def test_recursive_cli_resumes_from_existing_checkpoint(monkeypatch, tmp_path):
         max_devices=100,
         on_collected=None,
         resume_state=None,
+        **kwargs,
     ):
         captured["resume_state"] = resume_state
         bundle = DeviceBundle(
@@ -785,6 +798,7 @@ def test_recursive_cli_writes_bundle_manifest(monkeypatch, tmp_path):
         max_devices=100,
         on_collected=None,
         resume_state=None,
+        **kwargs,
     ):
         bundle = DeviceBundle(
             device_name=seed_device.name,
@@ -891,6 +905,7 @@ def test_missing_checkpoint_file_is_handled(monkeypatch, tmp_path):
         max_devices=100,
         on_collected=None,
         resume_state=None,
+        **kwargs,
     ):
         captured["resume_state"] = resume_state
         bundle = DeviceBundle(
@@ -1018,6 +1033,7 @@ def test_recursive_cli_uses_config_default_block_for_credentials(monkeypatch, tm
         max_devices=100,
         on_collected=None,
         resume_state=None,
+        **kwargs,
     ):
         captured["default_credentials"] = default_credentials
         bundle = DeviceBundle(
@@ -1073,6 +1089,177 @@ def test_load_default_credentials_returns_empty_when_no_default(tmp_path):
     , encoding="utf-8")
 
     assert load_default_credentials(config_path) == {}
+
+
+def test_interactive_temp_inventory_is_deleted_on_success(monkeypatch, tmp_path):
+    inputs = iter(["10.0.0.1", "admin", "<PASSWORD-01>", "22", "cisco"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: next(inputs))
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [{"name": "sw", "hostname": "10.0.0.1", "vendor": "cisco", "username": "admin", "password": "<PASSWORD-01>"}])
+
+    bundles = []
+    def fake_execute(device, dry_run=False):
+        from app.models import DeviceBundle
+        bundles.append(device)
+        return DeviceBundle(
+            device_name=device.name,
+            device_vendor=device.vendor,
+            timestamp="2026-09-01T00:00:00Z",
+            summary={"status": "dry-run-success"},
+            raw_outputs={},
+            failed_commands=[],
+        )
+    monkeypatch.setattr("app.cli.execute_device_collection", fake_execute)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: tmp_path / bundle.device_name)
+
+    monkeypatch.setattr("sys.argv", ["prog", "--output-dir", str(tmp_path), "--dry-run"])
+    from app.cli import main
+    main()
+    assert not any(Path(p).name.startswith("interactive_devices_") for p in (tmp_path.glob("*")))
+
+
+def test_interactive_temp_inventory_is_deleted_on_exception(monkeypatch, tmp_path):
+    import app.cli as cli_module
+    captured_paths = []
+    original_prompt = cli_module._prompt_interactive_inventory
+
+    def tracking_prompt():
+        path = original_prompt()
+        captured_paths.append(path)
+        return path
+
+    inputs = iter(["10.0.0.1", "admin", "<PASSWORD-01>", "22", "cisco"])
+    monkeypatch.setattr("app.cli._prompt_interactive_inventory", tracking_prompt)
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: next(inputs))
+    monkeypatch.setattr("app.cli.load_devices", lambda path: (_ for _ in ()).throw(RuntimeError("boom")))
+
+    monkeypatch.setattr("sys.argv", ["prog", "--output-dir", str(tmp_path)])
+    from app.cli import main
+    try:
+        main()
+    except RuntimeError:
+        pass
+    assert captured_paths
+    assert not captured_paths[0].exists()
+
+
+def test_interactive_temp_inventory_is_deleted_on_dry_run(monkeypatch, tmp_path):
+    inputs = iter(["10.0.0.1", "admin", "<PASSWORD-01>", "22", "cisco"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: next(inputs))
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [{"name": "sw", "hostname": "10.0.0.1", "vendor": "cisco", "username": "admin", "password": "<PASSWORD-01>"}])
+    monkeypatch.setattr("app.cli.execute_device_collection", lambda device, dry_run=False: None)
+
+    monkeypatch.setattr("sys.argv", ["prog", "--output-dir", str(tmp_path), "--dry-run", "--probe"])
+    from app.cli import main
+    main()
+    assert not any(Path(p).name.startswith("interactive_devices_") for p in (tmp_path.glob("*")))
+
+
+def test_prompt_interactive_inventory_writes_valid_yaml(monkeypatch):
+    inputs = iter(["10.0.0.1", "admin", "22", "cisco"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "<PASSWORD-01>")
+
+    runtime_path = _prompt_interactive_inventory()
+
+    import yaml
+    data = yaml.safe_load(runtime_path.read_text(encoding="utf-8"))
+    assert data["devices"][0]["hostname"] == "10.0.0.1"
+    assert data["devices"][0]["username"] == "admin"
+    assert data["devices"][0]["password"] == "<PASSWORD-01>"
+    assert data["devices"][0]["port"] == 22
+    assert data["devices"][0]["vendor"] == "cisco"
+    runtime_path.unlink(missing_ok=True)
+
+
+def test_prompt_interactive_inventory_defaults_port_and_vendor(monkeypatch):
+    inputs = iter(["10.0.0.2", "admin", "", ""])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "<PASSWORD-01>")
+
+    runtime_path = _prompt_interactive_inventory()
+    import yaml
+    data = yaml.safe_load(runtime_path.read_text(encoding="utf-8"))
+    assert data["devices"][0]["port"] == 22
+    assert data["devices"][0]["vendor"] == "auto"
+    runtime_path.unlink(missing_ok=True)
+
+
+def test_prompt_interactive_inventory_password_not_echoed(monkeypatch):
+    captured = []
+
+    def recording_input(prompt):
+        captured.append(("input", prompt))
+        return next(inputs)
+
+    def capturing_getpass(prompt):
+        captured.append(("getpass", prompt))
+        return "<PASSWORD-01>"
+
+    inputs = iter(["10.0.0.3", "admin", "22", ""])
+    monkeypatch.setattr("builtins.input", recording_input)
+    monkeypatch.setattr("getpass.getpass", capturing_getpass)
+
+    runtime_path = _prompt_interactive_inventory()
+    input_values = [value for kind, value in captured if kind == "input"]
+    assert "<PASSWORD-01>" not in input_values
+    assert any(kind == "getpass" for kind, _ in captured)
+    runtime_path.unlink(missing_ok=True)
+
+
+def test_prompt_interactive_inventory_unlinks_file_on_yaml_failure(monkeypatch):
+    inputs = iter(["10.0.0.4", "admin", "22", ""])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "<PASSWORD-01>")
+
+    def failing_dump(*args, **kwargs):
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr("yaml.safe_dump", failing_dump)
+    with pytest.raises(RuntimeError, match="disk full"):
+        _prompt_interactive_inventory()
+    assert not any(Path(p).name.startswith("interactive_devices_") for p in Path(tempfile.gettempdir()).glob("interactive_devices_*"))
+
+
+def test_prompt_interactive_inventory_propagates_unlink_failure(monkeypatch):
+    inputs = iter(["10.0.0.5", "admin", "22", ""])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "<PASSWORD-01>")
+
+    def fake_mkstemp(*args, **kwargs):
+        return -1, str(Path(tempfile.gettempdir()) / "interactive_devices_unlink_fail.yml")
+
+    def failing_dump(*args, **kwargs):
+        raise RuntimeError("disk full")
+
+    def failing_unlink(self, *args, **kwargs):
+        raise OSError(13, "Permission denied")
+
+    monkeypatch.setattr("tempfile.mkstemp", fake_mkstemp)
+    monkeypatch.setattr("yaml.safe_dump", failing_dump)
+    monkeypatch.setattr("pathlib.Path.unlink", failing_unlink)
+    with pytest.raises(OSError, match="Permission denied"):
+        _prompt_interactive_inventory()
+    assert not Path(tempfile.gettempdir(), "interactive_devices_unlink_fail.yml").exists()
+
+
+def test_non_recursive_cli_writes_analysis_artifacts(monkeypatch, tmp_path):
+    inputs = iter(["10.0.0.5", "admin", "22", ""])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "<PASSWORD-01>")
+
+    def failing_dump(*args, **kwargs):
+        raise RuntimeError("disk full")
+
+    def failing_unlink(self, *args, **kwargs):
+        raise OSError(13, "Permission denied")
+
+    monkeypatch.setattr("yaml.safe_dump", failing_dump)
+    monkeypatch.setattr("pathlib.Path.unlink", failing_unlink)
+    with pytest.raises(OSError, match="Permission denied"):
+        _prompt_interactive_inventory()
 
 
 def test_non_recursive_cli_writes_analysis_artifacts(monkeypatch, tmp_path):
@@ -1217,6 +1404,7 @@ def test_recursive_cli_writes_analysis_artifacts(monkeypatch, tmp_path):
         max_devices=100,
         on_collected=None,
         resume_state=None,
+        **kwargs,
     ):
         bundles = {}
         for name in ("seed-sw", "neighbor-sw"):
