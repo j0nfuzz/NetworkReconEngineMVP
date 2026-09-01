@@ -833,3 +833,98 @@ without verbal assistance.
 ### Design Principle
 
 A troubleshooting platform is not complete until someone who did not build it can successfully use it.
+
+## Operational Principle
+
+The platform should ultimately be usable by a network engineer with no Python, Git or development knowledge.
+
+Engineers should not need to:
+
+- Install Python
+- Create virtual environments
+- Run pip
+- Clone repositories
+- Edit configuration files
+- Use PowerShell
+
+Preferred user experience:
+
+Launch tool
+→ Enter device details
+→ Collect diagnostics
+→ Receive bundled output
+
+All future deployment and usability decisions should move towards this experience.
+
+---
+
+## Phase 18 - Portable Distribution
+
+### Goal
+
+Package the platform for engineers who are not developers.
+
+Desired outcome:
+
+Download package.
+
+Extract package.
+
+Run tool.
+
+Collect diagnostics.
+
+No Python installation required.
+
+### Requirements
+
+Distribution must include:
+
+- Embedded runtime
+- Embedded dependencies
+- Embedded bootstrap logic
+- Configuration templates
+- Portable execution support
+
+Engineers must not be required to:
+
+- Clone repositories
+- Install Python
+- Create virtual environments
+- Run pip
+- Modify PATH
+
+### Supported Formats
+
+Priority order:
+
+1. Portable directory
+2. Self-extracting archive
+3. Single executable
+
+### Validation
+
+Test on:
+
+- Clean Windows workstation
+- Standard user account
+- No Python installed
+
+Collection must succeed without additional setup.
+
+### Out Of Scope
+
+- MSI installers
+- Enterprise deployment systems
+- Auto-update mechanisms
+
+### Benefits
+
+- Easier deployment
+- Easier onboarding
+- Reduced support overhead
+- Greater field usability
+
+### Design Principle
+
+A network engineer should be able to download the package and begin collecting diagnostics immediately.

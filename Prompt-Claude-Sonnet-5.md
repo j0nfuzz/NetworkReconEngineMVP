@@ -1,4 +1,4 @@
-# Wishes-Claude-Sonnet-5.md
+# Prompt-Claude-Sonnet-5.md
 
 # Read PROJECT-STANDARD.md First
 

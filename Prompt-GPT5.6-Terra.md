@@ -1,4 +1,4 @@
-# Wishes-GPT5.6-Sonnet.md
+# Prompt-GPT5.6-Terra.md
 
 # Read PROJECT-STANDARD.md First
 
@@ -235,6 +235,86 @@ Do not propose multiple phases.
 
 ---
 
+### Release Recommendation
+
+If the review verdict is Approved:
+
+- Generate a recommended git commit message.
+- Determine whether the current phase represents a stable checkpoint suitable for push.
+- Output one of:
+
+PUSH RECOMMENDED
+
+or
+
+DO NOT PUSH
+
+- Provide the exact git commands required.
+
+Format:
+
+COMMIT MESSAGE:
+<message>
+
+PUSH DECISION:
+PUSH RECOMMENDED
+
+COMMANDS:
+git add <explicit file list only>
+git commit -m "<message>"
+git push
+
+
+If the review verdict is Not Approved:
+
+PUSH DECISION:
+DO NOT PUSH
+
+Reason:
+<brief reason>
+
+The reviewer MUST recommend:
+
+DO NOT PUSH
+
+
+if any of the following are true:
+
+- Review Verdict is Not Approved
+- DDR status does not match the review outcome
+- Required review artefacts are missing
+- Required implementation artefacts are missing
+- Outstanding Critical Issues exist
+
+Only recommend PUSH RECOMMENDED when repository state, review state and DDR state are mutually consistent.
+
+Commit messages should follow:
+
+PHASE-XXX: <short description>
+
+Examples:
+
+PHASE-018A: remediate scoped parallel collection bounds
+PHASE-017B: resolve checkpoint scope persistence
+PHASE-016B: restore bootstrap implementation
+
+For PUSH RECOMMENDED decisions, assess whether the repository represents a stable engineering checkpoint.
+
+A stable checkpoint:
+
+- Passes all tests executed during review
+- Has an Approved verdict
+- Has no unresolved Critical Issues
+- Has DDR state correctly recorded
+- Can be safely used as a rollback point
+
+If these conditions are not met output:
+
+PUSH DECISION:
+DO NOT PUSH
+
+---
+
 ## Token Efficiency Rules
 
 Keep total output under 300 tokens.
@@ -313,3 +393,4 @@ A successful response:
 - Produces a concise review artefact.
 
 Nothing more.
+

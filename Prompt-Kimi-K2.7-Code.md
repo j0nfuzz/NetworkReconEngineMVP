@@ -1,4 +1,4 @@
-# Wishes-Kimi-K2.7-Code.md
+# Prompt-Kimi-K2.7-Code.md
 
 # Read PROJECT-STANDARD.md First
 
