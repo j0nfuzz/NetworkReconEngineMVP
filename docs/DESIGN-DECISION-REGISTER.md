@@ -232,3 +232,25 @@ Date:
 
 Phase:
 PHASE-018-ParallelScopedCollection
+
+---
+
+Decision ID: DD-006
+
+Decision:
+Provide an opt-in legacy dependency profile for portable embedded builds via `--legacy`, installing requirements-legacy.txt instead of requirements.txt.
+
+Reason:
+Allows field-tested legacy SSH compatibility without weakening the default embedded-runtime profile.
+
+Status:
+Approved
+
+Approver:
+GPT Reviewer
+
+Date:
+2026-09-01
+
+Phase:
+PHASE-029-SSHLegacyKexPortableSupport

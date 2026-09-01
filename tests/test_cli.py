@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import struct
 import tempfile
 import zipfile
 from pathlib import Path
@@ -435,6 +436,57 @@ def test_ssh_client_retries_on_legacy_kex_failure(monkeypatch):
     result = client.connect()
     assert isinstance(result, FakeSSHClient)
     assert calls["count"] == 2
+
+
+def test_ssh_client_explain_error_includes_kex_diagnostics():
+    peer_kex = ["diffie-hellman-group1-sha1"]
+    explanation = DeviceSSHClient.explain_compatibility_error(
+        paramiko.SSHException("Incompatible ssh peer (no acceptable kex algorithm)"),
+        peer_kex_algorithms=peer_kex,
+    )
+    assert "Supported KEX algorithms" in explanation
+    assert "Peer offered KEX algorithms" in explanation
+    assert "diffie-hellman-group1-sha1" in explanation
+
+
+def test_ssh_client_explain_error_without_peer_kex_is_actionable():
+    explanation = DeviceSSHClient.explain_compatibility_error(
+        paramiko.SSHException("Incompatible ssh peer (no acceptable kex algorithm)")
+    )
+    assert "Supported KEX algorithms" in explanation
+    assert "Peer offered KEX algorithms" in explanation
+    assert "requirements-legacy.txt" in explanation
+
+
+def test_ssh_client_extract_peer_kex_from_kexinit_packet():
+    # SSH_MSG_KEXINIT (20), 16-byte cookie, then name-list length + "person@example.com,diffie-hellman-group14-sha256"
+    cookie = b"\x00" * 16
+    kex_names = "person@example.com,diffie-hellman-group14-sha256"
+    name_list = struct.pack(">I", len(kex_names)) + kex_names.encode("utf-8")
+    packet = bytes([20]) + cookie + name_list
+    peer_kex = DeviceSSHClient._extract_peer_kex_from_init(packet)
+    assert peer_kex == ["person@example.com", "diffie-hellman-group14-sha256"]
+
+
+def test_ssh_client_probe_reports_kex_diagnostics(monkeypatch):
+    class FakeSSHClient:
+        def set_missing_host_key_policy(self, policy):
+            return None
+
+        def connect(self, **kwargs):
+            raise paramiko.SSHException("Incompatible ssh peer (no acceptable kex algorithm)")
+
+    monkeypatch.setattr(paramiko, "SSHClient", FakeSSHClient)
+    monkeypatch.setattr(
+        DeviceSSHClient,
+        "get_peer_kex_algorithms",
+        classmethod(lambda cls, hostname, port, timeout: ["diffie-hellman-group1-sha1"]),
+    )
+    client = DeviceSSHClient("192.0.2.1", "admin", "<PASSWORD-01>", timeout=1)
+    result = client.probe()
+    assert result["reachable"] is False
+    assert "Supported KEX algorithms" in result["error"]
+    assert "diffie-hellman-group1-sha1" in result["error"]
 
 
 def test_run_command_returns_failure_for_eof_error():

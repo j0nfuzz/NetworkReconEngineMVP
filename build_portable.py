@@ -9,9 +9,14 @@
 # Legacy mode:
 #   Builds the previous PyInstaller onedir executable. Pass --pyinstaller.
 #
+# Legacy embedded mode:
+#   Bundles the embedded runtime with requirements-legacy.txt instead of
+#   requirements.txt. Pass --legacy.
+#
 # Usage:
 #   .\.venv\Scripts\python.exe -m build_portable
 #   .\.venv\Scripts\python.exe -m build_portable --pyinstaller
+#   .\.venv\Scripts\python.exe -m build_portable --legacy
 
 import argparse
 import os
@@ -104,8 +109,9 @@ def _download(url: str, dest: Path) -> None:
     urllib.request.urlretrieve(url, dest)
 
 
-def _build_embedded(repo_root: Path, dist_dir: Path) -> int:
+def _build_embedded(repo_root: Path, dist_dir: Path, *, legacy: bool = False) -> int:
     """Bundle the official CPython embeddable runtime with the application."""
+    requirements_file = "requirements-legacy.txt" if legacy else "requirements.txt"
     build_dir = repo_root / "build" / "embedded"
     downloads_dir = repo_root / "build" / "downloads"
     bundle_dir = build_dir / "NetworkReconEngine"
@@ -155,9 +161,9 @@ def _build_embedded(repo_root: Path, dist_dir: Path) -> int:
         print("Failed to install pip into embedded runtime.")
         return result.returncode
 
-    print("Installing dependencies into embedded runtime ...")
+    print(f"Installing dependencies into embedded runtime from {requirements_file} ...")
     result = subprocess.run(
-        [str(py_exe), "-m", "pip", "install", "--no-warn-script-location", "-r", "requirements.txt"],
+        [str(py_exe), "-m", "pip", "install", "--no-warn-script-location", "-r", requirements_file],
         cwd=repo_root,
         check=False,
     )
@@ -169,7 +175,10 @@ def _build_embedded(repo_root: Path, dist_dir: Path) -> int:
     shutil.copytree(repo_root / "app", bundle_dir / "app")
     shutil.copytree(repo_root / "config", bundle_dir / "config")
     shutil.copy2(repo_root / "run_portable.py", bundle_dir / "run_portable.py")
-    shutil.copy2(repo_root / "requirements.txt", bundle_dir / "requirements.txt")
+    shutil.copy2(repo_root / requirements_file, bundle_dir / requirements_file)
+    if legacy:
+        # Keep the modern manifest present for reference even in legacy bundles.
+        shutil.copy2(repo_root / "requirements.txt", bundle_dir / "requirements.txt")
 
     # Launcher scripts invoke the bundled interpreter directly.
     (bundle_dir / "Start_NetworkRecon.cmd").write_text(
@@ -203,14 +212,22 @@ def main() -> int:
         action="store_true",
         help="Build the legacy PyInstaller executable instead of the embedded-runtime bundle.",
     )
+    parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="Build the embedded-runtime bundle with requirements-legacy.txt for older SSH targets.",
+    )
     args = parser.parse_args()
+
+    if args.pyinstaller and args.legacy:
+        parser.error("--pyinstaller and --legacy cannot be used together.")
 
     repo_root = Path(__file__).resolve().parent
     dist_dir = repo_root / "dist"
 
     if args.pyinstaller:
         return _build_pyinstaller(repo_root, dist_dir)
-    return _build_embedded(repo_root, dist_dir)
+    return _build_embedded(repo_root, dist_dir, legacy=args.legacy)
 
 
 if __name__ == "__main__":

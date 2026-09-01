@@ -72,10 +72,31 @@ Do not include:
 
 ---
 
-Date: 2026-08-04
+Date: 2026-09-01
 Agent: Kimi
 
-Phase: PHASE-002A-RoleDetectionRemediation
+Phase: PHASE-029-SSHLegacyKexPortableSupport
+
+Changes:
+- app/ssh_client.py now reports Paramiko-supported and peer-offered KEX algorithms in KEX failure messages.
+- build_portable.py gained a --legacy flag that builds the embedded runtime with requirements-legacy.txt.
+- Added tests for KEX diagnostic messages, peer KEX packet parsing, and legacy build argument handling.
+
+Reason:
+- Field testing observed paramiko IncompatiblePeer ("no acceptable kex algorithm") at 192.168.21.30; existing compatibility reordering only reorders Paramiko-supported algorithms and the embedded runtime bundle had no path to the legacy profile.
+
+Risks Introduced:
+- Peer KEX probe performs an additional TCP handshake and may add latency on unreachable hosts.
+- Legacy profile enables known-weak algorithms; restricted to explicit opt-in.
+
+Risks Resolved:
+- KEX failures now provide actionable supported/peer KEX diagnostics.
+- Portable embedded builds can target legacy SSH devices without replacing Paramiko.
+
+Next Recommended Action:
+- Field-test diagnostics against 192.168.21.30 and schedule GPT review of DD-006.
+
+---
 
 Changes:
 - app/cli.py now classifies role for every device, not only vendor="auto".

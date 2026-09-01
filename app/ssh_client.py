@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import socket
+import struct
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 import paramiko
 
@@ -26,6 +27,79 @@ class DeviceSSHClient:
             if algorithm in supported and algorithm not in preferred:
                 preferred.append(algorithm)
         paramiko.Transport._preferred_kex = tuple(preferred)
+
+    @staticmethod
+    def get_supported_kex_algorithms() -> List[str]:
+        """Return the KEX algorithms Paramiko currently prefers/supports."""
+        preferred = getattr(paramiko.Transport, "_preferred_kex", None)
+        if preferred is not None:
+            return list(preferred)
+        return list(getattr(paramiko.Transport, "_kex_info", {}).keys())
+
+    @staticmethod
+    def _parse_name_list(packet: bytes, offset: int) -> tuple[List[str], int]:
+        """Parse an RFC 4251 `name-list` starting at offset. Returns (names, new_offset)."""
+        if len(packet) < offset + 4:
+            return [], offset
+        length = struct.unpack(">I", packet[offset : offset + 4])[0]
+        offset += 4
+        if length == 0 or len(packet) < offset + length:
+            return [], offset
+        names = packet[offset : offset + length].decode("utf-8", errors="replace")
+        offset += length
+        return [name.strip() for name in names.split(",") if name.strip()], offset
+
+    @staticmethod
+    def _extract_peer_kex_from_init(remote_kex_init: Optional[bytes]) -> Optional[List[str]]:
+        """Extract the peer's offered KEX algorithms from a raw SSH_MSG_KEXINIT packet."""
+        if not remote_kex_init:
+            return None
+        # SSH_MSG_KEXINIT = 20 (1 byte), 16 byte cookie, then name-lists.
+        # KEX algorithms is the first name-list.
+        if len(remote_kex_init) < 17 or remote_kex_init[0] != 20:
+            return None
+        offset = 17
+        kex_algorithms, _ = DeviceSSHClient._parse_name_list(remote_kex_init, offset)
+        return kex_algorithms if kex_algorithms else None
+
+    @classmethod
+    def get_peer_kex_algorithms(
+        cls,
+        hostname: str,
+        port: int = 22,
+        timeout: int = 15,
+    ) -> Optional[List[str]]:
+        """Attempt a transport-level handshake to capture the peer's offered KEX list.
+
+        This deliberately avoids host-key verification or authentication.  Any failure
+        returns ``None`` so that diagnostics degrade gracefully when the peer cannot be
+        probed.
+        """
+        sock: Optional[socket.socket] = None
+        transport: Optional[paramiko.Transport] = None
+        try:
+            sock = socket.create_connection((hostname, port), timeout=timeout)
+            transport = paramiko.Transport(sock)
+            transport.start_client(timeout=timeout)
+            return cls._extract_peer_kex_from_init(getattr(transport, "remote_kex_init", None))
+        except Exception:
+            # Try to salvage the peer KEX init even if negotiation failed.
+            if transport is not None:
+                peer_kex = cls._extract_peer_kex_from_init(getattr(transport, "remote_kex_init", None))
+                if peer_kex:
+                    return peer_kex
+            return None
+        finally:
+            if transport is not None:
+                try:
+                    transport.close()
+                except Exception:
+                    pass
+            if sock is not None:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
 
     def __init__(
         self,
@@ -65,19 +139,35 @@ class DeviceSSHClient:
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     @staticmethod
-    def explain_compatibility_error(exc: Exception) -> str:
-        message = str(exc)
+    def _is_kex_error(message: str) -> bool:
         lowered = message.lower()
-        if "no acceptable kex algorithm" in lowered or "group14-sha1" in lowered or "group1-sha1" in lowered:
+        return (
+            "no acceptable kex algorithm" in lowered
+            or "group14-sha1" in lowered
+            or "group1-sha1" in lowered
+            or ("keyerror" in lowered and "kex" in lowered)
+        )
+
+    @classmethod
+    def explain_compatibility_error(
+        cls,
+        exc: Exception,
+        *,
+        peer_kex_algorithms: Optional[Sequence[str]] = None,
+    ) -> str:
+        message = str(exc)
+        supported = cls.get_supported_kex_algorithms()
+        supported_text = ", ".join(supported) if supported else "(unknown)"
+        peer_text = ", ".join(peer_kex_algorithms) if peer_kex_algorithms else "(could not be obtained)"
+
+        if cls._is_kex_error(message):
             return (
-                "SSH key exchange negotiation failed. This often happens when the target device is older or only "
-                "accepts older SHA1-based key exchange algorithms. Paramiko 5.x supports the current modern KEX "
-                "set, so the device may require a newer SSH profile or a different access path."
-            )
-        if "keyerror" in lowered and "kex" in lowered:
-            return (
-                "SSH KEX negotiation failed because the server selected an algorithm that Paramiko does not support "
-                "for this session. The device may be using an older or restricted SSH policy."
+                "SSH key exchange negotiation failed. "
+                f"Supported KEX algorithms: {supported_text}. "
+                f"Peer offered KEX algorithms: {peer_text}. "
+                "No common algorithm was found. The device may only support older SHA1-based KEX algorithms "
+                "that Paramiko no longer enables by default. Use a legacy Paramiko profile (requirements-legacy.txt) "
+                "or update the device's SSH configuration."
             )
         return message
 
@@ -87,7 +177,14 @@ class DeviceSSHClient:
             self.close(client)
             return {"reachable": True, "status": "connected"}
         except (socket.timeout, TimeoutError, paramiko.SSHException, OSError, KeyError, RuntimeError) as exc:
-            return {"reachable": False, "status": "unreachable", "error": self.explain_compatibility_error(exc)}
+            peer_kex = None
+            if self._is_kex_error(str(exc)):
+                peer_kex = self.get_peer_kex_algorithms(self.hostname, self.port, self.timeout)
+            return {
+                "reachable": False,
+                "status": "unreachable",
+                "error": self.explain_compatibility_error(exc, peer_kex_algorithms=peer_kex),
+            }
         except Exception as exc:
             return {"reachable": False, "status": "unreachable", "error": str(exc)}
 
@@ -110,11 +207,12 @@ class DeviceSSHClient:
             except (paramiko.SSHException, KeyError) as exc:
                 last_error = exc
                 message = str(exc).lower()
-                if "no acceptable kex algorithm" in message or "group14-sha1" in message or "group1-sha1" in message or "keyerror" in message:
+                if self._is_kex_error(message):
                     if attempt == 0:
                         self._apply_ssh_compatibility_settings()
                         continue
-                    raise
+                    peer_kex = self.get_peer_kex_algorithms(self.hostname, self.port, self.timeout)
+                    raise type(exc)(self.explain_compatibility_error(exc, peer_kex_algorithms=peer_kex))
                 raise
             except Exception:
                 raise
