@@ -90,8 +90,8 @@ for ($i = 0; $i -lt $beforeList.Count; $i++) {
 }
 
 # 4. Confirm no commit on the rewritten master shows the old identity.
-$authorHits  = git log master --format=%an,%ae | Select-String -Pattern "<COMPANY>"
-$committerHits = git log master --format=%cn,%ce | Select-String -Pattern "<COMPANY>"
+$authorHits  = git log master --format=%an,%ae | Select-String -Pattern "example-employer"
+$committerHits = git log master --format=%cn,%ce | Select-String -Pattern "example-employer"
 if ($authorHits -or $committerHits) { throw "Old identity still present in history" }
 
 Write-Host "Validation passed: $($afterList.Count) commits rewritten, order/messages/trees preserved, no old identity found."

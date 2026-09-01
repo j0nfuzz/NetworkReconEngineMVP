@@ -36,7 +36,7 @@ FILES ADDED:
 
 VALIDATION EVIDENCE:
 - git grep -i "sapphire": no matches (tracked content clean).
-- git grep -i "<COMPANY>": no matches (tracked content clean).
+- git grep -i "example-employer": no matches (tracked content clean).
 - git grep -i "<USERNAME>": no matches (tracked content clean).
 - NetworkDeviceDiagnostics.spec Analysis path is now ['run_portable.py'] with no local user path.
 - git status confirms NetworkRecon.zip and test_bootstrap/* are staged for deletion from tracking.
