@@ -6,7 +6,7 @@ Prepared (rewrite not executed)
 
 FILES ADDED:
 - .mailmap
-  - Maps <PERSON> <person@example.com> to <USERNAME> <person@example.com>.
+  - Maps <USERNAME> <person@example.com> to <USERNAME> <person@example.com>.
   - Non-destructive: affects `git log`/`git shortlog` display only until a rewrite is executed.
 - docs/Phases/IMPLEMENTED-PHASE-026-GitHistoryAuthorSanitisation.md (this file)
 
