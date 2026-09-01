@@ -30,6 +30,10 @@ output/
 live_output/
 demo_output/
 config/interactive_devices.yml
+test_bootstrap/
+
+# Packaged distribution artefacts
+*.zip
 
 # LLM context packs / checkpoints
 context_packs/

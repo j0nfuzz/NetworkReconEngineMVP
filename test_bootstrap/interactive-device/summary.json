@@ -1,9 +1,0 @@
-{
-  "device": "interactive-device",
-  "hostname": "192.0.2.1",
-  "vendor": "generic",
-  "status": "unreachable",
-  "commands_run": 0,
-  "failed_commands": [],
-  "error": "timed out"
-}

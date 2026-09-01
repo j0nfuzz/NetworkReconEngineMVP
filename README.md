@@ -229,35 +229,55 @@ Per-device host-key options are also supported in the inventory (`host_key_polic
 
 ## Portable distribution
 
-A self-contained Windows executable can be built from the repository using PyInstaller. This allows the tool to run on a workstation that does not have Python or Git installed.
+The recommended distribution for managed enterprise endpoints is an embedded Python runtime bundle. This avoids low-prevalence PyInstaller executables that are blocked by Microsoft Defender ASR Rule `01443614-CD74-433A-B99E-2ECDC07BFC25` ("Block executable files from running unless they meet a prevalence, age, or trusted list criterion") before the application can start, as observed during field testing on a <CUSTOMER> production server.
 
-Build the executable from the project root:
+Build the default embedded-runtime bundle from the project root:
 
 ```powershell
 .\.venv\Scripts\python.exe -m build_portable
 ```
 
-The build produces `dist\NetworkDeviceDiagnostics.zip`, a single archive containing `NetworkDeviceDiagnostics.exe` and its bundled dependencies. Extract the archive on the target workstation and run the executable with the same arguments as the Python CLI.
+The build produces `dist\NetworkReconEngine.zip`. Extract the archive on the target workstation and run the launcher script:
+
+```powershell
+.\Start_NetworkRecon.cmd --output-dir output --verbose
+```
+
+or, if PowerShell script execution is permitted:
+
+```powershell
+.\Start_NetworkRecon.ps1 --output-dir output --verbose
+```
+
+The bundle contains the official, unmodified CPython embeddable interpreter from python.org, the application source (`app/`), runtime dependencies, a `config/` directory, and the launcher scripts. No system Python installation, virtual environment, or administrative rights are required.
 
 ### Interactive packaged launch
 
-If you do not have a prepared inventory, launch the executable without `--config` and enter the device details at the prompts:
+If you do not have a prepared inventory, launch without `--config` and enter the device details at the prompts:
 
 ```powershell
-.\NetworkDeviceDiagnostics.exe --output-dir output --verbose
+.\Start_NetworkRecon.cmd --output-dir output --verbose
 ```
 
-The executable will prompt for hostname/IP, username, hidden password, SSH port (default `22`), and vendor (default `auto`), then write a temporary runtime YAML and continue with collection.
+The launcher will prompt for hostname/IP, username, hidden password, SSH port (default `22`), and vendor (default `auto`), then write a temporary runtime YAML and continue with collection.
 
 ### Packaged launch with an existing inventory
 
 If you already have an inventory file, use the same `--config` path as the source CLI:
 
 ```powershell
-.\NetworkDeviceDiagnostics.exe --config config\devices.yml --output-dir output
+.\Start_NetworkRecon.cmd --config config\devices.yml --output-dir output
 ```
 
-Some endpoint protection products may quarantine or delete unsigned executables; if this happens, restore the file from quarantine or build the executable on the target workstation.
+### Legacy PyInstaller executable
+
+The previous PyInstaller-based executable build is retained as a secondary option for environments where it is permitted:
+
+```powershell
+.\.venv\Scripts\python.exe -m build_portable --pyinstaller
+```
+
+This produces `dist\NetworkDeviceDiagnostics.zip` containing `NetworkDeviceDiagnostics.exe`. On managed endpoints with strict ASR policies this executable may be blocked before startup.
 
 The source-based workflow remains available and unchanged for development or custom environments.
 

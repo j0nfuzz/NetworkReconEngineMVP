@@ -1,27 +1,56 @@
-# Build a self-contained Windows executable for network device diagnostics.
-# Requires: PowerShell, Python 3.12+, and a virtual environment with PyInstaller.
-# Usage: .\.venv\Scripts\python.exe -m build_portable
+# Build a self-contained Windows distribution for network device diagnostics.
+#
+# Default mode (recommended for managed endpoints):
+#   Bundles the official CPython embeddable runtime, application source, and
+#   dependencies into a ZIP. A launcher script invokes the bundled Python
+#   interpreter directly, avoiding low-prevalence PyInstaller executables that
+#   are blocked by Defender ASR Rule 01443614 on some enterprise endpoints.
+#
+# Legacy mode:
+#   Builds the previous PyInstaller onedir executable. Pass --pyinstaller.
+#
+# Usage:
+#   .\.venv\Scripts\python.exe -m build_portable
+#   .\.venv\Scripts\python.exe -m build_portable --pyinstaller
 
+import argparse
+import os
 import shutil
+import stat
 import subprocess
 import sys
+import urllib.request
 import zipfile
 from pathlib import Path
 
 
-def main() -> int:
-    repo_root = Path(__file__).resolve().parent
+def _rmtree_ro(path: Path) -> None:
+    """Remove a directory tree, including read-only files."""
+    def on_rm_error(func, check_path, exc_info):  # type: ignore[no-untyped-def]
+        os.chmod(check_path, stat.S_IWRITE)
+        func(check_path)
+
+    if path.exists():
+        shutil.rmtree(path, onerror=on_rm_error)
+
+PYTHON_VERSION = (3, 12, 10)
+EMBED_URL = (
+    "https://www.python.org/ftp/python/3.12.10/"
+    "python-3.12.10-embed-amd64.zip"
+)
+GET_PIP_URL = "https://bootstrap.pypa.io/get-pip.py"
+
+
+def _build_pyinstaller(repo_root: Path, dist_dir: Path) -> int:
+    """Build the legacy PyInstaller onedir executable."""
     venv_python = repo_root / ".venv" / "Scripts" / "python.exe"
     if not venv_python.exists():
         print("Virtual environment not found. Run the interactive bootstrap or setup first.")
         return 1
 
-    dist_dir = repo_root / "dist"
     build_dir = repo_root / "build" / "portable"
-
-    for directory in (dist_dir, build_dir):
-        if directory.exists():
-            shutil.rmtree(directory, ignore_errors=True)
+    _rmtree_ro(dist_dir)
+    _rmtree_ro(build_dir)
 
     cmd = [
         str(venv_python),
@@ -65,6 +94,123 @@ def main() -> int:
     print(f"Portable executable built: {executable}")
     print(f"Distributable package: {zip_path}")
     return 0
+
+
+def _download(url: str, dest: Path) -> None:
+    if dest.exists():
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Downloading {url} ...")
+    urllib.request.urlretrieve(url, dest)
+
+
+def _build_embedded(repo_root: Path, dist_dir: Path) -> int:
+    """Bundle the official CPython embeddable runtime with the application."""
+    build_dir = repo_root / "build" / "embedded"
+    downloads_dir = repo_root / "build" / "downloads"
+    bundle_dir = build_dir / "NetworkReconEngine"
+    python_dir = bundle_dir / "python"
+
+    _rmtree_ro(dist_dir)
+    _rmtree_ro(build_dir)
+    build_dir.mkdir(parents=True)
+
+    embed_zip = downloads_dir / "python-embed.zip"
+    get_pip = downloads_dir / "get-pip.py"
+    _download(EMBED_URL, embed_zip)
+    _download(GET_PIP_URL, get_pip)
+
+    bundle_dir.mkdir(parents=True)
+    python_dir.mkdir(parents=True)
+
+    with zipfile.ZipFile(embed_zip, "r") as zf:
+        zf.extractall(python_dir)
+
+    # Enable site-packages in the embedded runtime.
+    pth_file = python_dir / f"python{PYTHON_VERSION[0]}{PYTHON_VERSION[1]}._pth"
+    if pth_file.exists():
+        lines = pth_file.read_text(encoding="utf-8").splitlines()
+        new_lines: list[str] = []
+        found_site = False
+        for line in lines:
+            if line.strip() == "#import site":
+                new_lines.append("import site")
+                found_site = True
+            else:
+                new_lines.append(line)
+        if not found_site:
+            new_lines.append("import site")
+        new_lines.append("Lib\\site-packages")
+        pth_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+    py_exe = python_dir / "python.exe"
+
+    print("Installing pip into embedded runtime ...")
+    result = subprocess.run(
+        [str(py_exe), str(get_pip), "--no-warn-script-location"],
+        cwd=repo_root,
+        check=False,
+    )
+    if result.returncode != 0:
+        print("Failed to install pip into embedded runtime.")
+        return result.returncode
+
+    print("Installing dependencies into embedded runtime ...")
+    result = subprocess.run(
+        [str(py_exe), "-m", "pip", "install", "--no-warn-script-location", "-r", "requirements.txt"],
+        cwd=repo_root,
+        check=False,
+    )
+    if result.returncode != 0:
+        print("Failed to install dependencies into embedded runtime.")
+        return result.returncode
+
+    # Stage application files.
+    shutil.copytree(repo_root / "app", bundle_dir / "app")
+    shutil.copytree(repo_root / "config", bundle_dir / "config")
+    shutil.copy2(repo_root / "run_portable.py", bundle_dir / "run_portable.py")
+    shutil.copy2(repo_root / "requirements.txt", bundle_dir / "requirements.txt")
+
+    # Launcher scripts invoke the bundled interpreter directly.
+    (bundle_dir / "Start_NetworkRecon.cmd").write_text(
+        "@echo off\n"
+        "cd /d \"%~dp0\"\n"
+        "python\\python.exe run_portable.py %*\n",
+        encoding="utf-8",
+    )
+    (bundle_dir / "Start_NetworkRecon.ps1").write_text(
+        "$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path\n"
+        "& (Join-Path $scriptDir 'python\\python.exe') "
+        "(Join-Path $scriptDir 'run_portable.py') @args\n",
+        encoding="utf-8",
+    )
+
+    dist_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = dist_dir / "NetworkReconEngine.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for item in bundle_dir.rglob("*"):
+            arcname = item.relative_to(bundle_dir)
+            zf.write(item, arcname=str(arcname))
+
+    print(f"Embedded runtime bundle: {zip_path}")
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Build a portable Windows distribution.")
+    parser.add_argument(
+        "--pyinstaller",
+        action="store_true",
+        help="Build the legacy PyInstaller executable instead of the embedded-runtime bundle.",
+    )
+    args = parser.parse_args()
+
+    repo_root = Path(__file__).resolve().parent
+    dist_dir = repo_root / "dist"
+
+    if args.pyinstaller:
+        return _build_pyinstaller(repo_root, dist_dir)
+    return _build_embedded(repo_root, dist_dir)
 
 
 if __name__ == "__main__":

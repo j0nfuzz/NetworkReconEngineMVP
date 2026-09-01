@@ -1752,3 +1752,80 @@ Risks Resolved:
 Next Recommended Action:
 - GPT review of PHASE-022D.
 
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-024-EmbeddedPythonRuntimeDistribution
+
+Changes:
+- Updated build_portable.py to default to an embedded-runtime bundle.
+- Bundled the official CPython 3.12.10 embeddable interpreter, app/, config/, dependencies, and Start_NetworkRecon.cmd/.ps1 launchers into dist\NetworkReconEngine.zip.
+- Updated run_portable.py to insert the bundle root into sys.path for the embedded interpreter.
+- Updated README.md and docs/HOWTO-PORTABLE.md to document the embedded-runtime workflow and the <CUSTOMER> ASR Rule 01443614 field-test evidence.
+- Retained --pyinstaller flag for the legacy executable build.
+
+Reason:
+- <CUSTOMER> field testing proved the PyInstaller .exe is blocked by Defender ASR Rule 01443614 before startup, while scripts are allowed; the remaining blocker was Python availability. Bundling the official embeddable runtime removes the install dependency without code-signing or MSIX.
+
+Risks Introduced:
+- ZIP size is materially larger (embedded interpreter + dependencies).
+- Whether the embedded python.exe avoids ASR blocking on all estates requires further field validation.
+
+Risks Resolved:
+- Default distribution no longer requires a system Python installation.
+- Default distribution avoids low-prevalence PyInstaller executables.
+
+Next Recommended Action:
+- Field-validate the embedded runtime bundle on the <CUSTOMER> managed endpoint.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-025-PublicReleaseSanitisation
+
+Changes:
+- Replaced the real customer/tenant field-test identifier with a neutral placeholder name across README.md, docs/HOWTO-PORTABLE.md, docs/PROJECT-JOURNAL.md, and PHASE-023/024 artefacts.
+- Replaced the hard-coded local workstation path in NetworkDeviceDiagnostics.spec (employer + personal name) with a relative path.
+- Removed NetworkRecon.zip and test_bootstrap/* from git tracking; added test_bootstrap/ and *.zip to .gitignore.
+
+Reason:
+- Repository is intended for public GitHub publication; a sanitisation review identified the customer/tenant name, an employer/personal path, and unnecessary tracked binary artefacts as publication blockers.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Real customer/tenant identifier no longer present in tracked documentation.
+- Employer/personal local path no longer present in the tracked spec file.
+- Unnecessary tracked binary artefacts removed from source control.
+
+Next Recommended Action:
+- Execute PHASE-026-GitHistoryAuthorSanitisation to remove the employer-identifiable author metadata still present in git commit history.
+
+---
+
+Date: 2026-09-01
+Agent: Kimi
+
+Phase: PHASE-026-GitHistoryAuthorSanitisation
+
+Changes:
+- Added .mailmap mapping the real employer-identifiable author identity to the neutral <USERNAME> identity across all 34 commits.
+- Documented the exact git filter-repo, validation, rollback, and force-push commands in IMPLEMENTED-PHASE-026-GitHistoryAuthorSanitisation.md; the rewrite itself was not executed.
+
+Reason:
+- PHASE-025 resolved file-content publication blockers; the remaining blocker is author/committer metadata in 32 of 34 commits, which requires an explicit, owner-approved history rewrite rather than an automatic one.
+
+Risks Introduced:
+- None from this preparation step; the documented rewrite will change all commit hashes and require a force-push once executed.
+
+Risks Resolved:
+- None yet; the actual commit objects are unchanged until the documented rewrite is executed by the repository owner.
+
+Next Recommended Action:
+- Repository owner reviews and executes the documented git filter-repo rewrite, validates the result, and force-pushes per the recorded plan.
+

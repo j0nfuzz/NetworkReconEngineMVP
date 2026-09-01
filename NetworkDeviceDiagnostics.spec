@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['C:/Users/<USERNAME>/OneDrive - <COMPANY>/Desktop/Scripts/network_device_diagnostics/run_portable.py'],
+    ['run_portable.py'],
     pathex=[],
     binaries=[],
     datas=[],

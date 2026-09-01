@@ -147,11 +147,11 @@ At the output root, `bundle_manifest.json` lists device bundles. CLI runs also g
 
 Dry runs are different: they create simulated raw command output and a raw summary, but do not produce health-scoring or troubleshooting artifacts.
 
-## Packaged executable
+## Packaged embedded-runtime bundle
 
-A self-contained Windows executable can be produced from a source checkout using PyInstaller.
+The recommended distribution for managed enterprise endpoints bundles the official CPython embeddable runtime with the application source and dependencies. This avoids low-prevalence executables produced by PyInstaller, which were blocked before startup during field testing on a <CUSTOMER> production server by Microsoft Defender ASR Rule `01443614-CD74-433A-B99E-2ECDC07BFC25` ("Block executable files from running unless they meet a prevalence, age, or trusted list criterion").
 
-Build the executable:
+Build the bundle:
 
 ```powershell
 .\.venv\Scripts\python.exe -m build_portable
@@ -160,17 +160,33 @@ Build the executable:
 The result is written to:
 
 ```text
-dist\NetworkDeviceDiagnostics.zip
+dist\NetworkReconEngine.zip
 ```
 
-Extract the zip on a target workstation. It does not require Python, Git, or a virtual environment.
+Extract the zip on a target workstation. It does not require a system Python installation, Git, or a virtual environment.
+
+The archive contains:
+
+- `python/` - official, unmodified CPython embeddable interpreter from python.org
+- `app/` - application source
+- `config/` - sample inventory directory
+- `run_portable.py` - packaged entry point
+- `Start_NetworkRecon.cmd` - double-click launcher
+- `Start_NetworkRecon.ps1` - PowerShell launcher
+- `requirements.txt` - dependency manifest
 
 ### Interactive packaged launch
 
-For the simplest technician workflow, launch the executable without `--config`:
+For the simplest technician workflow, launch without `--config`:
 
 ```powershell
-.\NetworkDeviceDiagnostics.exe --output-dir output --verbose
+.\Start_NetworkRecon.cmd --output-dir output --verbose
+```
+
+or, if PowerShell script execution is permitted:
+
+```powershell
+.\Start_NetworkRecon.ps1 --output-dir output --verbose
 ```
 
 The tool prompts for:
@@ -186,7 +202,7 @@ It writes the answers to a temporary runtime YAML in the system temp directory, 
 For a dry-run validation without connecting:
 
 ```powershell
-.\NetworkDeviceDiagnostics.exe --output-dir demo_output --dry-run
+.\Start_NetworkRecon.cmd --output-dir demo_output --dry-run
 ```
 
 ### Packaged launch with an existing inventory
@@ -194,18 +210,26 @@ For a dry-run validation without connecting:
 If you already have a device inventory, pass `--config` as usual:
 
 ```powershell
-.\NetworkDeviceDiagnostics.exe --config config\devices.yml --output-dir output --verbose
+.\Start_NetworkRecon.cmd --config config\devices.yml --output-dir output --verbose
 ```
 
 For a recursive run with a checkpoint file:
 
 ```powershell
-.\NetworkDeviceDiagnostics.exe --config config\devices.yml --output-dir output --recursive --checkpoint-file output\checkpoint.json --verbose
+.\Start_NetworkRecon.cmd --config config\devices.yml --output-dir output --recursive --checkpoint-file output\checkpoint.json --verbose
 ```
 
-The packaged executable bundles the same dependencies and command profiles used by the source workflow. Distributing the interactive workflow only requires placing the extracted `NetworkDeviceDiagnostics` folder and an output location on the target workstation; distributing the `--config` workflow also requires a valid `config\devices.yml`.
+Distributing the interactive workflow only requires the extracted `NetworkReconEngine` folder and an output location on the target workstation. Distributing the `--config` workflow also requires a valid `config\devices.yml`.
 
-Some endpoint protection products may quarantine or delete unsigned executables. If the executable is removed after copying, restore it from the endpoint protection quarantine or build the package directly on the target workstation.
+## Legacy PyInstaller executable
+
+The previous PyInstaller-based executable build is retained as a secondary option for environments where it is permitted:
+
+```powershell
+.\.venv\Scripts\python.exe -m build_portable --pyinstaller
+```
+
+This produces `dist\NetworkDeviceDiagnostics.zip` containing `NetworkDeviceDiagnostics.exe`. On managed endpoints with strict ASR policies this executable may be blocked before startup, as observed during <CUSTOMER> field testing.
 
 ## Direct CLI Recovery
 
