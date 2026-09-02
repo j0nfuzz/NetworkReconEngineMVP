@@ -160,4 +160,6 @@ def build_device_summary(bundle: DeviceBundle) -> Dict[str, Any]:
         "routes": routes,
         "arp_entries": arp_entries,
         "interface_errors": interface_errors,
+        "failed_commands": summary.get("failed_commands", []),
+        "failed_command_details": summary.get("failed_command_details", []),
     }

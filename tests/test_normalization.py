@@ -79,6 +79,8 @@ def test_build_device_summary_deterministic_shape():
         "routes",
         "arp_entries",
         "interface_errors",
+        "failed_commands",
+        "failed_command_details",
     }
     assert set(result.keys()) == expected_keys
 

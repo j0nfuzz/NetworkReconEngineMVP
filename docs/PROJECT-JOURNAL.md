@@ -72,6 +72,55 @@ Do not include:
 
 ---
 
+Date: 2026-09-02
+Agent: Kimi
+
+Phase: PHASE-031-FieldEvidenceSerializationVerification
+
+Changes:
+- Created docs/Phases/PHASE-031-FieldEvidenceSerializationVerification.md from the architect definition, resolving the missing phase artefact flagged in REVIEW-PHASE-031.
+- Added tests/test_cli.py::test_failed_command_partial_output_survives_in_bundle_artifacts covering failed command stdout/stderr retention through the device ZIP archive.
+
+Reason:
+- Reviewer identified the PHASE-031 definition file was absent and requested regression coverage for partial output retention before approving the phase.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Missing phase definition artefact is now discoverable by review tooling.
+- Partial output retention is regression-protected through the ZIP bundle path.
+
+Next Recommended Action:
+- Re-run GPT review of PHASE-031.
+
+---
+
+Date: 2026-09-02
+Agent: Kimi
+
+Phase: PHASE-031-FieldEvidenceSerializationVerification
+
+Changes:
+- app/normalization.py build_device_summary() now copies failed_commands and failed_command_details from bundle.summary.
+- app/troubleshooting.py build_troubleshooting_bundle() now includes failed_commands and failed_command_details.
+- Added tests/test_cli.py::test_failed_command_details_survive_into_bundle_artifacts covering summary.json, troubleshooting_bundle.json, and the device ZIP archive.
+- Updated tests/test_normalization.py and tests/test_troubleshooting.py key-shape assertions.
+
+Reason:
+- REVIEW-PHASE-030 found PHASE-030 evidence absent from on-disk artefacts. Investigation showed build_device_summary() dropped the keys before troubleshooting_bundle.json was generated; the field bundle also predated the PHASE-030 commit.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Per-command failure evidence (elapsed_seconds, error_type) now survives into all serialized review artefacts.
+
+Next Recommended Action:
+- Re-run field validation with current code and schedule GPT review of PHASE-031.
+
+---
+
 Date: 2026-09-01
 Agent: Kimi
 

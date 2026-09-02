@@ -1856,3 +1856,105 @@ def test_analysis_pipeline_order_is_deterministic(monkeypatch, tmp_path):
     assert (device_dir / "summary.json").exists()
     assert (device_dir / "troubleshooting_bundle.json").exists()
 
+
+def test_failed_command_details_survive_into_bundle_artifacts(tmp_path):
+    """PHASE-031 regression: elapsed_seconds and error_type survive serialization."""
+    failed_details = [
+        {
+            "command": "show interfaces",
+            "elapsed_seconds": 15.23,
+            "error_type": "timeout",
+        },
+        {
+            "command": "show ip route",
+            "elapsed_seconds": 0.04,
+            "error_type": "ssh_exception",
+        },
+    ]
+    bundle = DeviceBundle(
+        device_name="partial-sw",
+        device_vendor="cisco",
+        timestamp="2026-08-04T00:00:00Z",
+        summary={
+            "device": "partial-sw",
+            "hostname": "10.0.0.1",
+            "vendor": "cisco",
+            "status": "partial",
+            "commands_run": 5,
+            "failed_commands": ["show interfaces", "show ip route"],
+            "failed_command_details": failed_details,
+        },
+        raw_outputs={"show version": "Cisco IOS XE Software, Version 17.09.04"},
+        failed_commands=["show interfaces", "show ip route"],
+    )
+
+    from app.collector import write_bundle
+
+    device_dir = write_bundle(bundle, tmp_path)
+
+    summary_payload = json.loads((device_dir / "summary.json").read_text(encoding="utf-8"))
+    troubleshooting_payload = json.loads((device_dir / "troubleshooting_bundle.json").read_text(encoding="utf-8"))
+
+    assert summary_payload["failed_commands"] == ["show interfaces", "show ip route"]
+    assert summary_payload["failed_command_details"] == failed_details
+    assert troubleshooting_payload["failed_commands"] == ["show interfaces", "show ip route"]
+    assert troubleshooting_payload["failed_command_details"] == failed_details
+
+    with zipfile.ZipFile(device_dir.with_suffix(".zip"), "r") as zf:
+        archived_summary = json.loads(zf.read("summary.json"))
+        archived_troubleshooting = json.loads(zf.read("troubleshooting_bundle.json"))
+    assert archived_summary["failed_command_details"] == failed_details
+    assert archived_troubleshooting["failed_command_details"] == failed_details
+
+
+def test_failed_command_partial_output_survives_in_bundle_artifacts(tmp_path):
+    """PHASE-031 regression: partial stdout/stderr from a failed command is packaged unchanged."""
+    partial_stdout = "Interface summary line 1\nInterface summary line 2"
+    partial_stderr = "Warning: truncated"
+    failed_details = [
+        {
+            "command": "show interfaces",
+            "elapsed_seconds": 15.23,
+            "error_type": "timeout",
+        },
+    ]
+    raw_outputs = {
+        "show version": "Cisco IOS XE Software, Version 17.09.04",
+        "show interfaces": (
+            f"ERROR: Command timed out\n"
+            f"STDOUT:\n{partial_stdout}\n"
+            f"STDERR:\n{partial_stderr}"
+        ),
+    }
+    bundle = DeviceBundle(
+        device_name="partial-sw",
+        device_vendor="cisco",
+        timestamp="2026-08-04T00:00:00Z",
+        summary={
+            "device": "partial-sw",
+            "hostname": "10.0.0.1",
+            "vendor": "cisco",
+            "status": "partial",
+            "commands_run": 2,
+            "failed_commands": ["show interfaces"],
+            "failed_command_details": failed_details,
+        },
+        raw_outputs=raw_outputs,
+        failed_commands=["show interfaces"],
+    )
+
+    from app.collector import write_bundle
+
+    device_dir = write_bundle(bundle, tmp_path)
+
+    artifact_path = device_dir / "show_interfaces.txt"
+    assert artifact_path.exists()
+    artifact_text = artifact_path.read_text(encoding="utf-8")
+    assert partial_stdout in artifact_text
+    assert partial_stderr in artifact_text
+
+    artifact_bytes = artifact_path.read_bytes()
+    with zipfile.ZipFile(device_dir.with_suffix(".zip"), "r") as zf:
+        archived_artifact = zf.read("show_interfaces.txt")
+    assert archived_artifact == artifact_bytes
+

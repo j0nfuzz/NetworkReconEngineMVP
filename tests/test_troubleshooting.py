@@ -61,6 +61,8 @@ def test_build_troubleshooting_bundle_deterministic_shape():
         "warnings",
         "critical",
         "evidence",
+        "failed_commands",
+        "failed_command_details",
         "briefing",
     }
     assert set(result.keys()) == expected_keys
