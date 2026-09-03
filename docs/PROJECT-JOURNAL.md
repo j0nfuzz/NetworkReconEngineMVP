@@ -2547,3 +2547,28 @@ Risks Resolved:
 Next Recommended Action:
 - Run GPT review of PHASE-042 and approved DD-010.
 
+---
+
+Date: 2026-09-03
+Agent: Claude
+
+Phase: MalformedCredentialPlaceholderValidation
+
+Changes:
+- Reviewed Terra's PHASE-042 rejection: PHASE-042 explicitly required "Reject missing or malformed credential variable references with a clear error"; `${NRE-BAD}` matches the malformed case and was incorrectly accepted as a literal.
+- Determined this is an implementation defect against an explicit acceptance criterion, not reviewer overreach or a future enhancement.
+- Created PHASE-043-MalformedCredentialPlaceholderValidation.md as a narrow remediation scoped to malformed `${...}` detection only.
+
+Reason:
+- PHASE-042's literal-value preservation criterion applies to values with no `${`/`}` markers; values using `${...}` syntax with invalid variable names are malformed references, not literals, and must fail per the explicit acceptance criterion.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- Clarifies the exact remediation scope needed to satisfy PHASE-042's rejected acceptance criterion.
+
+Next Recommended Action:
+- Implement PHASE-043-MalformedCredentialPlaceholderValidation.
+
+
