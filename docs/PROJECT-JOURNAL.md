@@ -284,6 +284,31 @@ Risks Resolved:
 
 Next Recommended Action:
 - If a reachable lab/field device becomes available, rerun collection to capture timeout/recovery events; otherwise DD-007 remains approved but inconclusively validated by real hardware.
+
+---
+
+Date: 2026-09-03
+Agent: Claude
+
+Phase: CredentialFileExposureRemediation
+
+Changes:
+- Confirmed PHASE-040 closure: Terra approved, ELIGIBLE FOR PUSH.
+- Determined the PHASE-032-040 timeout-diagnostics workstream is complete; DD-007 remains Approved/inconclusive on real hardware; no further field-evidence phase is warranted without a reachable device.
+- Identified config/interactive_devices.yml is tracked in git with a live plaintext password (OWASP A02/A07 concern).
+- Created PHASE-041-CredentialFileExposureRemediation.md to untrack secret-bearing config files and add example templates.
+
+Reason:
+- A concrete, hardware-independent security defect was found during PHASE-040 evidence review; remediating it is higher value than repeating an evidence phase that cannot currently produce new information.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- Establishes a scoped path to stop further plaintext credential exposure in version control.
+
+Next Recommended Action:
+- Implement PHASE-041-CredentialFileExposureRemediation; separately, consider authorizing credential rotation and git-history purge.
 - Introspection helpers may encounter transport-specific exceptions; they degrade to error diagnostics.
 
 Risks Resolved:
