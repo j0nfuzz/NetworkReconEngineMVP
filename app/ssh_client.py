@@ -261,7 +261,143 @@ class DeviceSSHClient:
 
         return partial_stdout, partial_stderr
 
-    def run_command(self, command: str, *, client: Optional[paramiko.SSHClient] = None) -> Dict[str, object]:
+    @staticmethod
+    def _transport_is_active(client: Optional[paramiko.SSHClient]) -> bool:
+        try:
+            return bool(client and client.get_transport() and client.get_transport().is_active())
+        except Exception:
+            return False
+
+    @staticmethod
+    def _channel_state(channel: Optional[paramiko.Channel]) -> Dict[str, object]:
+        """Return non-blocking channel state diagnostics for root-cause analysis."""
+        if channel is None:
+            return {"exists": False}
+        try:
+            return {
+                "exists": True,
+                "active": channel.active,
+                "eof_received": channel.eof_received,
+                "closed": channel.closed,
+                "exit_status_ready": channel.exit_status_ready(),
+                "recv_ready": channel.recv_ready(),
+                "recv_stderr_ready": channel.recv_stderr_ready(),
+            }
+        except Exception as exc:
+            return {"exists": True, "error": str(exc)}
+
+    @staticmethod
+    def _transport_state(client: Optional[paramiko.SSHClient]) -> Dict[str, object]:
+        """Return non-blocking transport state diagnostics for root-cause analysis."""
+        try:
+            transport = client.get_transport() if client else None
+            if transport is None:
+                return {"exists": False}
+            return {
+                "exists": True,
+                "active": transport.is_active(),
+                "authenticated": transport.is_authenticated() if hasattr(transport, "is_authenticated") else None,
+            }
+        except Exception as exc:
+            return {"exists": bool(client is not None), "error": str(exc)}
+
+    def _build_original_timeout_result(
+        self,
+        command: str,
+        elapsed: float,
+        partial_stdout: str,
+        partial_stderr: str,
+        client: Optional[paramiko.SSHClient],
+        channel: Optional[paramiko.Channel],
+    ) -> Dict[str, object]:
+        return {
+            "command": command,
+            "stdout": partial_stdout,
+            "stderr": partial_stderr,
+            "exit_code": -1,
+            "success": False,
+            "error": "Command timed out or failed",
+            "elapsed_seconds": elapsed,
+            "error_type": "timeout",
+            "transport_active": self._transport_is_active(client),
+            "transport_state": self._transport_state(client),
+            "channel_state": self._channel_state(channel),
+            "recovery_attempted": False,
+            "recovery_successful": None,
+        }
+
+    def _try_recover_timeout(
+        self,
+        command: str,
+        original_result: Dict[str, object],
+    ) -> Dict[str, object]:
+        new_client: Optional[paramiko.SSHClient] = None
+        recovered_base = {
+            **original_result,
+            "original_stdout": original_result.get("stdout"),
+            "original_stderr": original_result.get("stderr"),
+            "original_elapsed_seconds": original_result.get("elapsed_seconds"),
+            "original_error": original_result.get("error"),
+            "original_error_type": original_result.get("error_type"),
+            "original_transport_active": original_result.get("transport_active"),
+            "original_transport_state": original_result.get("transport_state"),
+            "original_channel_state": original_result.get("channel_state"),
+            "recovery_attempted": True,
+        }
+        try:
+            new_client = self.connect()
+            # A timeout recovery must not apply recursively; run without retry.
+            retry = self._run_command_once(command, client=new_client, allow_recovery=False)
+            recovered = {
+                **recovered_base,
+                "recovery_successful": retry.get("success", False),
+                "retry_elapsed_seconds": retry.get("elapsed_seconds"),
+                "retry_exit_code": retry.get("exit_code"),
+                "retry_stdout": retry.get("stdout"),
+                "retry_stderr": retry.get("stderr"),
+                "retry_error": retry.get("error"),
+                "retry_error_type": retry.get("error_type"),
+                "retry_transport_active": retry.get("transport_active"),
+                "retry_transport_state": retry.get("transport_state"),
+                "retry_channel_state": retry.get("channel_state"),
+                "_recovered_client": new_client if retry.get("success", False) else None,
+            }
+            if retry.get("success", False):
+                recovered["success"] = True
+                recovered["stdout"] = retry.get("stdout")
+                recovered["stderr"] = retry.get("stderr")
+                recovered["exit_code"] = retry.get("exit_code")
+                recovered["error"] = retry.get("error")
+                recovered["elapsed_seconds"] = retry.get("elapsed_seconds")
+                recovered["transport_active"] = retry.get("transport_active")
+                recovered["transport_state"] = retry.get("transport_state")
+                recovered["channel_state"] = retry.get("channel_state")
+            else:
+                recovered["error"] = f"Timeout recovery failed: {retry.get('error')}"
+                try:
+                    new_client.close()
+                except Exception:
+                    pass
+            return recovered
+        except Exception as exc:
+            if new_client is not None:
+                try:
+                    new_client.close()
+                except Exception:
+                    pass
+            recovered_base["recovery_successful"] = False
+            recovered_base["retry_error"] = f"Recovery connection failed: {exc}"
+            recovered_base["error"] = f"Timeout recovery failed: {exc}"
+            recovered_base["_recovered_client"] = None
+            return recovered_base
+
+    def _run_command_once(
+        self,
+        command: str,
+        *,
+        client: Optional[paramiko.SSHClient] = None,
+        allow_recovery: bool = True,
+    ) -> Dict[str, object]:
         if client is None:
             client = self.connect()
 
@@ -279,19 +415,18 @@ class DeviceSSHClient:
         except (socket.timeout, TimeoutError) as exc:
             elapsed = time.perf_counter() - start
             partial_stdout, partial_stderr = self._read_partial_output(stdout, stderr)
-            return {
-                "command": command,
-                "stdout": partial_stdout,
-                "stderr": partial_stderr,
-                "exit_code": -1,
-                "success": False,
-                "error": f"Command timed out or failed: {exc}",
-                "elapsed_seconds": elapsed,
-                "error_type": "timeout",
-            }
+            channel = stdout.channel if stdout is not None else None
+            original_result = self._build_original_timeout_result(
+                command, elapsed, partial_stdout, partial_stderr, client, channel
+            )
+            original_result["error"] = f"Command timed out or failed: {exc}"
+            if allow_recovery:
+                return self._try_recover_timeout(command, original_result)
+            return original_result
         except (EOFError, paramiko.ssh_exception.SSHException, OSError) as exc:
             elapsed = time.perf_counter() - start
             partial_stdout, partial_stderr = self._read_partial_output(stdout, stderr)
+            channel = stdout.channel if stdout is not None else None
             return {
                 "command": command,
                 "stdout": partial_stdout,
@@ -301,6 +436,11 @@ class DeviceSSHClient:
                 "error": f"Command timed out or failed: {exc}",
                 "elapsed_seconds": elapsed,
                 "error_type": "ssh_exception",
+                "transport_active": self._transport_is_active(client),
+                "transport_state": self._transport_state(client),
+                "channel_state": self._channel_state(channel),
+                "recovery_attempted": False,
+                "recovery_successful": None,
             }
 
         elapsed = time.perf_counter() - start
@@ -312,9 +452,24 @@ class DeviceSSHClient:
             "success": exit_code == 0,
             "error": stderr_data if exit_code != 0 else None,
             "elapsed_seconds": elapsed,
+            "transport_active": self._transport_is_active(client),
+            "transport_state": self._transport_state(client),
+            "channel_state": self._channel_state(stdout.channel if stdout is not None else None),
+            "recovery_attempted": False,
+            "recovery_successful": None,
         }
 
-    def close(self, client: paramiko.SSHClient) -> None:
+    def run_command(
+        self,
+        command: str,
+        *,
+        client: Optional[paramiko.SSHClient] = None,
+    ) -> Dict[str, object]:
+        return self._run_command_once(command, client=client, allow_recovery=True)
+
+    def close(self, client: Optional[paramiko.SSHClient]) -> None:
+        if client is None:
+            return
         try:
             client.close()
         except Exception:

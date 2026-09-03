@@ -94,6 +94,56 @@ Next Recommended Action:
 - Architect selects next implementation phase; no further action on PHASE-038.
 
 ---
+
+Date: 2026-09-03
+Agent: Claude
+
+Phase: RecoveredSessionDiagnosticStateRefresh
+
+Changes:
+- Confirmed PHASE-038 closure: Terra approved, 184 tests passing, no production changes, ELIGIBLE FOR PUSH.
+- Assessed the PHASE-036/037/038 diagnostic instrumentation chain: channel/transport diagnostics are captured, serialized into all evidence artefacts, and regression-tested for both recovered and failed commands.
+- Identified one remaining architectural gap: app/ssh_client.py's `_try_recover_timeout` spreads `**original_result` first, so a successfully recovered command's top-level `channel_state`/`transport_state` still describe the dead pre-retry session, not the live recovered one; no `retry_channel_state`/`retry_transport_state` exist today.
+- Created PHASE-039-RecoveredSessionDiagnosticStateRefresh.md to close this gap.
+
+Reason:
+- Root-cause investigation capability is incomplete while the diagnostic fields on a recovered command misrepresent which session (original or recovered) they describe.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- Clarifies the final remaining diagnostic-semantics limitation as a scoped, testable follow-on.
+
+Next Recommended Action:
+- Implement PHASE-039-RecoveredSessionDiagnosticStateRefresh.
+
+---
+
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-039-RecoveredSessionDiagnosticStateRefresh
+
+Changes:
+- Updated app/ssh_client.py _try_recover_timeout() to preserve original_channel_state/original_transport_state, capture retry_channel_state/retry_transport_state, and refresh top-level channel_state/transport_state on successful recovery.
+- Added tests/test_ssh_client.py regression coverage for successful recovery, failed retry, and recovery connection failure.
+- Added IMPLEMENTED-PHASE-039-RecoveredSessionDiagnosticStateRefresh.md.
+
+Reason:
+- PHASE-039 acceptance criteria required recovered-command diagnostics to describe the recovered session, not the dead original session, while preserving the original snapshot for root-cause analysis.
+
+Risks Introduced:
+- Slightly larger result payload per recovered command.
+
+Risks Resolved:
+- Recovered-command channel_state/transport_state now accurately reflect the live session after a successful retry.
+
+Next Recommended Action:
+- Run GPT review of PHASE-039 and proposed DD-009.
+
+---
+
 Date: 2026-09-03
 Agent: Claude
 

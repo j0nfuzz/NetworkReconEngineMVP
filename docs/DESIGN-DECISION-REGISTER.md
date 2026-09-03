@@ -254,3 +254,69 @@ Date:
 
 Phase:
 PHASE-029-SSHLegacyKexPortableSupport
+
+---
+
+Decision ID: DD-007
+
+Decision:
+Perform exactly one reconnect and single retry on timeout failures only; do not retry ssh_exception failures.
+
+Reason:
+PHASE-032 field evidence shows an initial timeout followed by a cascade of ssh_exception failures against a dead Paramiko session. A bounded timeout-only recovery gathers evidence without masking device-side root causes or changing timeout/paging behaviour. The recovered client is adopted by the sequential collector and the obsolete client is closed exactly once; original timeout evidence is preserved separately from retry outcome.
+
+Status:
+Approved
+
+Approver:
+GPT Reviewer
+
+Date:
+2026-09-02
+
+Phase:
+PHASE-033-CommandTimeoutSessionRecovery
+
+---
+
+Decision ID: DD-008
+
+Decision:
+Every field-evidence collection run must automatically emit a provenance artifact containing the HEAD commit SHA and, if the working tree is dirty, the full uncommitted diff patch content plus a SHA-256 checksum of that patch.
+
+Reason:
+PHASE-034 review established that a diff fingerprint alone cannot reconstruct an uncommitted build; only durable, stored patch content is independently verifiable.
+
+Status:
+Approved
+
+Approver:
+GPT Reviewer
+
+Date:
+2026-09-03
+
+Phase:
+PHASE-035-FieldEvidenceBuildProvenance
+
+---
+
+Decision ID: DD-009
+
+Decision:
+Recovered-command diagnostic fields (channel_state/transport_state) must reflect the final session state after a successful retry, not the pre-retry snapshot; the pre-retry snapshot is preserved separately as original_channel_state/original_transport_state.
+
+Reason:
+The current recovery result spreads the original result first, leaving top-level channel_state/transport_state describing the dead original session even after a successful reconnect, misrepresenting which session the evidence describes.
+
+Status:
+Approved
+
+Approver:
+GPT Reviewer
+
+Date:
+2026-09-03
+
+Phase:
+PHASE-039-RecoveredSessionDiagnosticStateRefresh
