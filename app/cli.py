@@ -272,6 +272,10 @@ def _run_cli_collection(
                         connection = client.connect()
                         try:
                             result = client.run_command("show version", client=connection)
+                            if result.get("_recovered_client"):
+                                recovered = result["_recovered_client"]
+                                client.close(connection)
+                                connection = recovered
                             identity = identify_device(result.get("stdout", ""))
                             device.vendor = identity.vendor
                             device.metadata["identity"] = {

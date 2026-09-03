@@ -332,10 +332,10 @@ Reason:
 Enables secret-free tracked templates while preserving current YAML configuration and deterministic device-level overrides. PHASE-044 added validation so malformed references are rejected regardless of position.
 
 Status:
-Proposed
+Approved
 
 Approver:
-Pending GPT Reviewer approval
+GPT Reviewer
 
 Date:
 2026-09-03

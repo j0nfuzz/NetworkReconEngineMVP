@@ -62,5 +62,6 @@ def build_troubleshooting_bundle(
         "evidence": evidence,
         "failed_commands": list(summary.get("failed_commands") or []),
         "failed_command_details": list(summary.get("failed_command_details") or []),
+        "recovered_commands": list(summary.get("recovered_commands") or []),
         "briefing": "\n".join(briefing_lines),
     }

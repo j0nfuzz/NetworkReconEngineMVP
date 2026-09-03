@@ -7,10 +7,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
+import os
+
 from app.discovery import extract_neighbors
 from app.health import score_device_health
 from app.models import CommandResult, Device, DeviceBundle
 from app.normalization import build_device_summary
+from app.provenance import write_provenance_artifact
 from app.ssh_client import DeviceSSHClient
 from app.troubleshooting import build_troubleshooting_bundle
 from app.vendor_profiles import get_vendor_commands, validate_device_command_set
@@ -44,6 +47,7 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
     raw_outputs: Dict[str, str] = {}
     failed_commands: List[str] = []
     failed_command_details: List[Dict[str, object]] = []
+    recovered_commands: List[Dict[str, object]] = []
     role = (device.metadata.get("role") or {}).get("role")
     commands = get_vendor_commands(device.vendor, role=role)
     invalid_commands = validate_device_command_set(commands)
@@ -104,6 +108,10 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
     try:
         for command in commands:
             result = ssh_client.run_command(command, client=connection)
+            if result.get("_recovered_client"):
+                recovered = result["_recovered_client"]
+                ssh_client.close(connection)
+                connection = recovered
             if result["success"]:
                 raw_outputs[command] = result["stdout"]
             else:
@@ -113,11 +121,28 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
                     f"STDERR:\n{result.get('stderr', '')}"
                 )
                 failed_commands.append(command)
-                failed_command_details.append({
-                    "command": command,
-                    "elapsed_seconds": result.get("elapsed_seconds"),
-                    "error_type": result.get("error_type"),
-                })
+            command_evidence = {
+                "command": command,
+                "elapsed_seconds": result.get("elapsed_seconds"),
+                "error_type": result.get("error_type"),
+                "transport_active": result.get("transport_active"),
+                "transport_state": result.get("transport_state"),
+                "channel_state": result.get("channel_state"),
+                "recovery_attempted": result.get("recovery_attempted"),
+                "recovery_successful": result.get("recovery_successful"),
+                "original_error_type": result.get("original_error_type"),
+                "original_elapsed_seconds": result.get("original_elapsed_seconds"),
+                "original_stdout": result.get("original_stdout"),
+                "original_stderr": result.get("original_stderr"),
+                "original_transport_active": result.get("original_transport_active"),
+                "retry_error": result.get("retry_error"),
+                "retry_error_type": result.get("retry_error_type"),
+                "retry_elapsed_seconds": result.get("retry_elapsed_seconds"),
+            }
+            if result.get("success") and result.get("recovery_attempted"):
+                recovered_commands.append(command_evidence)
+            elif not result.get("success"):
+                failed_command_details.append(command_evidence)
             summary["commands_run"] += 1
     finally:
         ssh_client.close(connection)
@@ -125,6 +150,7 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
     summary["status"] = "collected" if not failed_commands else "partial"
     summary["failed_commands"] = failed_commands
     summary["failed_command_details"] = failed_command_details
+    summary["recovered_commands"] = recovered_commands
     summary["discovered_neighbors"] = extract_neighbors(device.vendor, raw_outputs)
     return DeviceBundle(
         device_name=device.name,
@@ -212,6 +238,8 @@ def write_bundle(bundle: DeviceBundle, output_dir: str | Path) -> Path:
     if not str(bundle.summary.get("status", "")).startswith("dry-run"):
         _write_analysis_artifacts(bundle, device_dir)
 
+    if os.environ.get("NRE_DISABLE_PROVENANCE", "").lower() not in ("1", "true", "yes"):
+        write_provenance_artifact(device_dir)
     zip_bundle(device_dir)
 
     return device_dir

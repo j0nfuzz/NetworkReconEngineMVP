@@ -162,4 +162,5 @@ def build_device_summary(bundle: DeviceBundle) -> Dict[str, Any]:
         "interface_errors": interface_errors,
         "failed_commands": summary.get("failed_commands", []),
         "failed_command_details": summary.get("failed_command_details", []),
+        "recovered_commands": summary.get("recovered_commands", []),
     }

@@ -81,6 +81,7 @@ def test_build_device_summary_deterministic_shape():
         "interface_errors",
         "failed_commands",
         "failed_command_details",
+        "recovered_commands",
     }
     assert set(result.keys()) == expected_keys
 
