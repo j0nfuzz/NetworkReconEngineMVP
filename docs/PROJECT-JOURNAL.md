@@ -309,6 +309,32 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-041-CredentialFileExposureRemediation; separately, consider authorizing credential rotation and git-history purge.
+
+---
+
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-041-CredentialFileExposureRemediation
+
+Changes:
+- Updated .gitignore to ignore all `config/*.yml` files while retaining tracked `config/*.yml.example` templates.
+- Created `config/devices.yml.example` and `config/interactive_devices.yml.example` with placeholder credentials only.
+- Untracked `config/devices.yml` and `config/interactive_devices.yml` from git (local copies preserved and ignored).
+- Updated README.md Option 3 to instruct copying from the example template and note the gitignore policy.
+- Created IMPLEMENTED-PHASE-041-CredentialFileExposureRemediation.md.
+
+Reason:
+- PHASE-040 review identified a live plaintext credential committed in `config/interactive_devices.yml`; PHASE-041 prevents future secret exposure in version control without rewriting history.
+
+Risks Introduced:
+- Operators must recreate local config files from example templates on fresh clones.
+
+Risks Resolved:
+- Future accidental commits of secret-bearing `config/*.yml` files are blocked by .gitignore.
+
+Next Recommended Action:
+- Run GPT review of PHASE-041; separately, authorize credential rotation and/or git history purge if required.
 - Introspection helpers may encounter transport-specific exceptions; they degrade to error diagnostics.
 
 Risks Resolved:
