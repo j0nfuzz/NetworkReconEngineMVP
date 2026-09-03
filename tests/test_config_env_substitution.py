@@ -216,3 +216,61 @@ devices:
     )
     devices = load_devices(config)
     assert devices[0]["password"] == "${literal prefix"
+
+
+def test_embedded_malformed_placeholder_with_prefix_rejected(tmp_path):
+    config = _write_config(
+        tmp_path,
+        """
+default:
+  password: prefix${NRE-BAD}
+devices:
+  - name: switch01
+    hostname: 10.0.0.1
+""",
+    )
+    with pytest.raises(ValueError, match="Malformed environment variable reference"):
+        load_devices(config)
+
+
+def test_embedded_malformed_placeholder_with_suffix_rejected(tmp_path):
+    config = _write_config(
+        tmp_path,
+        """
+default:
+  password: ${NRE-BAD}suffix
+devices:
+  - name: switch01
+    hostname: 10.0.0.1
+""",
+    )
+    with pytest.raises(ValueError, match="Malformed environment variable reference"):
+        load_devices(config)
+
+
+def test_embedded_malformed_placeholder_with_prefix_and_suffix_rejected(tmp_path):
+    config = _write_config(
+        tmp_path,
+        """
+devices:
+  - name: switch01
+    hostname: 10.0.0.1
+    password: foo${NRE BAD}bar
+""",
+    )
+    with pytest.raises(ValueError, match="Malformed environment variable reference"):
+        load_devices(config)
+
+
+def test_malformed_placeholder_with_only_closing_brace_in_literal_rejected(tmp_path):
+    config = _write_config(
+        tmp_path,
+        """
+devices:
+  - name: switch01
+    hostname: 10.0.0.1
+    password: not-a-ref}rest
+""",
+    )
+    devices = load_devices(config)
+    assert devices[0]["password"] == "not-a-ref}rest"

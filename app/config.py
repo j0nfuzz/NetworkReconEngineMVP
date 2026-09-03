@@ -12,8 +12,8 @@ _CREDENTIAL_FIELDS = ("username", "password", "enable_password")
 # Match exactly ${ENV_VAR_NAME} for credential substitution.
 _ENV_PLACEHOLDER_RE = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$")
 
-# Detect strings that look like environment-variable references but are not valid.
-_ENV_MALFORMED_RE = re.compile(r"\$\{.*\}")
+# Detect credential values that contain both placeholder markers.
+_ENV_MARKERS_RE = re.compile(r"\$\{.*\}", re.DOTALL)
 
 
 def _resolve_credential_value(value: Any, field_name: str = "credential") -> Any:
@@ -21,22 +21,20 @@ def _resolve_credential_value(value: Any, field_name: str = "credential") -> Any
 
     If the value is a string matching ${ENV_VAR}, look up the environment
     variable and return it.  Missing variables raise ValueError.  Non-string
-    values and literal strings are returned unchanged.  Malformed ${...}
-    references raise ValueError without exposing secret values.
+    values and literal strings are returned unchanged.  Any value containing
+    both ${ and } without being an exact valid reference raises ValueError
+    without exposing secret values.
     """
     if not isinstance(value, str):
         return value
-    if not value.startswith("${"):
-        return value
-    if _ENV_MALFORMED_RE.match(value) and not _ENV_PLACEHOLDER_RE.match(value):
+    if _ENV_PLACEHOLDER_RE.match(value):
+        env_name = value[2:-1]
+        if env_name not in os.environ:
+            raise ValueError(f"Missing environment variable for credential: ${{{env_name}}}")
+        return os.environ[env_name]
+    if _ENV_MARKERS_RE.search(value):
         raise ValueError(f"Malformed environment variable reference for {field_name}")
-    match = _ENV_PLACEHOLDER_RE.match(value)
-    if not match:
-        return value
-    env_name = match.group(1)
-    if env_name not in os.environ:
-        raise ValueError(f"Missing environment variable for credential: ${{{env_name}}}")
-    return os.environ[env_name]
+    return value
 
 
 def _load_config_payload(config_path: str | Path) -> Dict[str, Any]:

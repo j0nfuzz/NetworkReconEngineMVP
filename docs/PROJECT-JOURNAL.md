@@ -2599,4 +2599,57 @@ Risks Resolved:
 Next Recommended Action:
 - Run GPT review of PHASE-043 and the re-proposed DD-010.
 
+---
+
+Date: 2026-09-03
+Agent: Claude
+
+Phase: MalformedCredentialPlaceholderDetectionRemediation
+
+Changes:
+- Reviewed Terra's PHASE-043 rejection: PHASE-042 and PHASE-043 both define a malformed reference as a value that "contains `${` and `}`" and does not match the exact `${VALID_ENV_VAR_NAME}` pattern; `prefix${NRE-BAD}` satisfies that literal definition and was incorrectly accepted as a literal because app/config.py only inspects values starting with `${`.
+- Determined this is a genuine acceptance-criteria failure, not reviewer overreach: the phase text never restricted detection to values anchored at the start of the string.
+- Determined the credential model is "exact references only": PHASE-042's acceptance criteria describe substitution of the entire field value, never interpolation within a larger string; `prefix${NRE-BAD}` must be treated as malformed placeholder syntax, not a literal credential.
+- Created PHASE-044-MalformedCredentialPlaceholderDetectionRemediation.md as a narrow remediation scoped to detecting `${`/`}` markers anywhere in the value, not only at the start.
+- DD-010 remains Rejected pending this remediation.
+
+Reason:
+- PHASE-043's own acceptance criterion ("appears to be an environment-variable reference (contains `${` and `}`)") is defined by containment, not position; the implementation's `startswith("${")` guard narrowed the check beyond the written scope.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- Clarifies the exact remediation scope needed to satisfy PHASE-043's rejected acceptance criterion without re-litigating PHASE-041, credential rotation, vault integration, or timeout investigation.
+
+Next Recommended Action:
+- Implement PHASE-044-MalformedCredentialPlaceholderDetectionRemediation.
+
+---
+
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-044-MalformedCredentialPlaceholderDetectionRemediation
+
+Changes:
+- Replaced the `startswith("${")` guard in app/config.py with a check for exact valid `${ENV_VAR}` references followed by rejection of any value containing both `${` and `}` markers anywhere in the string.
+- Updated `_resolve_credential_value()` to resolve exact references first, reject remaining marker-containing values as malformed, and return literal values unchanged.
+- Added 4 regression tests to tests/test_config_env_substitution.py covering malformed placeholders with leading prefix, trailing suffix, both prefix and suffix, and a literal containing `}` but no `${`.
+- Created IMPLEMENTED-PHASE-044-MalformedCredentialPlaceholderDetectionRemediation.md.
+- Re-proposed DD-010 in DESIGN-DECISION-REGISTER.md (status: Proposed, pending GPT reviewer approval).
+
+Reason:
+- Terra's PHASE-043 rejection identified that `prefix${NRE-BAD}` was accepted as a literal; PHASE-044 acceptance criteria explicitly require malformed detection based on marker containment rather than position.
+
+Risks Introduced:
+- None (narrow remediation; no changes to resolution order or literal-credential behaviour for values lacking both markers).
+
+Risks Resolved:
+- Embedded malformed credential placeholders are now rejected with a clear error instead of being used as secret values.
+- PHASE-043's rejected acceptance criterion is now fully satisfied.
+
+Next Recommended Action:
+- Run GPT review of PHASE-044 and the re-proposed DD-010.
+
 

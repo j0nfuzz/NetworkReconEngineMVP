@@ -326,10 +326,10 @@ PHASE-039-RecoveredSessionDiagnosticStateRefresh
 Decision ID: DD-010
 
 Decision:
-Allow exact `${ENV_VAR}` references for credential fields in YAML configuration; resolve them before existing default-to-device credential merging. Reject any credential value that contains `${...}` syntax but does not match the exact valid reference pattern.
+Allow exact `${ENV_VAR}` references for credential fields in YAML configuration; resolve them before existing default-to-device credential merging. Reject any credential value that contains both `${` and `}` markers anywhere in the value unless it matches the exact valid `${ENV_VAR}` pattern for the whole value.
 
 Reason:
-Enables secret-free tracked templates while preserving current YAML configuration and deterministic device-level overrides. PHASE-043 added validation so malformed references are no longer silently accepted as literal credentials.
+Enables secret-free tracked templates while preserving current YAML configuration and deterministic device-level overrides. PHASE-044 added validation so malformed references are rejected regardless of position.
 
 Status:
 Proposed
@@ -341,4 +341,4 @@ Date:
 2026-09-03
 
 Phase:
-PHASE-043-MalformedCredentialPlaceholderValidation
+PHASE-044-MalformedCredentialPlaceholderDetectionRemediation
