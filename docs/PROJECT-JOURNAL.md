@@ -147,6 +147,31 @@ Next Recommended Action:
 Date: 2026-09-03
 Agent: Claude
 
+Phase: FieldEvidencePostDiagnosticRefresh
+
+Changes:
+- Confirmed PHASE-039 closure: Terra approved, DD-009 approved, 10 focused tests + 187 full suite passing, ELIGIBLE FOR PUSH.
+- Assessed the PHASE-036/037/038/039 diagnostic instrumentation chain as architecturally complete: capture, serialization, failed/recovered artefact regression, and accurate recovered-session state refresh are all implemented and tested.
+- Determined synthetic (mocked) test evidence cannot confirm real-device behaviour; the outstanding risk carried since PHASE-037 ("diagnostic semantics require fresh field evidence") is now the correct next step, since instrumentation is finally trustworthy end-to-end.
+- Created PHASE-040-FieldEvidencePostDiagnosticRefresh.md to capture a fresh field bundle and determine whether DD-007's single-retry recovery policy is supported by real evidence.
+
+Reason:
+- Field evidence collection was deferred through PHASE-036-039 while instrumentation was incomplete; instrumentation is now complete, making evidence collection the highest-value next step to validate or challenge DD-007 before further engineering investment.
+
+Risks Introduced:
+- None (data-collection phase only).
+
+Risks Resolved:
+- Provides a path to close the long-carried "fresh field evidence" outstanding risk from PHASE-037.
+
+Next Recommended Action:
+- Implement PHASE-040-FieldEvidencePostDiagnosticRefresh.
+
+---
+
+Date: 2026-09-03
+Agent: Claude
+
 Phase: FailedDiagnosticArtifactRegression
 
 Changes:
@@ -233,6 +258,32 @@ Reason:
 
 Risks Introduced:
 - Slightly larger result payloads.
+
+---
+
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-040-FieldEvidencePostDiagnosticRefresh
+
+Changes:
+- Executed a fresh live collection run using `python -m app.cli --config config\devices.yml --output-dir field_output_040 --verbose` against the current approved commit (HEAD 7abcc4e, dirty working tree).
+- Verified each device bundle contains summary.json, troubleshooting_bundle.json, ai_prompt.txt, and build_provenance.json.
+- Verified build_provenance.json records HEAD SHA, dirty flag, working-tree patch, and SHA-256 checksum.
+- Created docs/FieldEvidence/PHASE-040-20260903-183540-bundle-findings.md documenting collection metadata, reachability summary, artefact verification, and DD-007 assessment.
+- Created IMPLEMENTED-PHASE-040-FieldEvidencePostDiagnosticRefresh.md.
+
+Reason:
+- PHASE-040 acceptance criteria required fresh field evidence to validate the completed timeout/recovery instrumentation chain and assess DD-007 against real hardware.
+
+Risks Introduced:
+- None (data-collection phase only).
+
+Risks Resolved:
+- The outstanding "fresh field evidence" risk from PHASE-037 has been actioned; instrumentation and provenance behaved correctly during a live run.
+
+Next Recommended Action:
+- If a reachable lab/field device becomes available, rerun collection to capture timeout/recovery events; otherwise DD-007 remains approved but inconclusively validated by real hardware.
 - Introspection helpers may encounter transport-specific exceptions; they degrade to error diagnostics.
 
 Risks Resolved:
