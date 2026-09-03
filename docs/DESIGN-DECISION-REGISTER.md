@@ -354,10 +354,10 @@ Reason:
 Wishlist Phase 14's own worked example requires multi-hop scoping (a 3-hop device chain); single-hop scoping has been an unaddressed risk since PHASE-017. Making depth an explicit, opt-in parameter preserves default behaviour and existing tests while unlocking the required capability.
 
 Status:
-Proposed
+Approved
 
 Approver:
-Pending GPT Reviewer approval
+GPT Reviewer
 
 Date:
 2026-09-03

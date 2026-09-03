@@ -2707,4 +2707,58 @@ Risks Resolved:
 Next Recommended Action:
 - Run GPT review of PHASE-045 and DD-011.
 
+---
+
+Date: 2026-09-03
+Agent: Claude
+
+Phase: MultiHopScopeFieldValidation
+
+Changes:
+- Confirmed PHASE-045 closure: Terra approved, DD-011 approved, 214 tests passing, stable checkpoint achieved.
+- Reassessed Wishlist Phase 14 (Topology-Aware Troubleshooting) against PHASE-017/017A/017B/018/018A/019/045: single-hop scoping, CLI target-device gating, parallel scoped collection, concurrency ceiling, and now bounded multi-hop traversal are all implemented and reviewed. The Wishlist's own worked 3-hop example (`AP12 -> SW02 -> SW01 -> FW01`) is directly satisfied by PHASE-045.
+- Determined Wishlist Phase 14 is now functionally complete; no remaining capability gap exists against its stated acceptance example.
+- Determined a field-validation phase is justified: PHASE-045's regression tests all exercise synthetic/mocked topology dictionaries; no phase has yet confirmed multi-hop scoping against a real discovered topology.json produced by actual CDP/LLDP-derived neighbours.
+- Created PHASE-046-MultiHopScopeFieldValidation.md as an evidence-collection-only phase.
+
+Reason:
+- Wishlist Phase 14 completion should be confirmed against real topology evidence before being considered fully closed, consistent with the project's precedent of field-validating synthetic-test-only capabilities (PHASE-032/034/040).
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; PHASE-046 is scoped to close the synthetic-vs-real evidence gap for multi-hop scoping.
+
+Next Recommended Action:
+- Implement PHASE-046-MultiHopScopeFieldValidation.
+
+---
+
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-046-MultiHopScopeFieldValidation
+
+Changes:
+- Executed two live `--target-device`/`--scope-depth` collection runs (depth 2 and depth 3) against the local `config/devices.yml` inventory; all three devices remain unreachable (same placeholder IPs documented unreachable in PHASE-040).
+- Documented that no real CDP/LLDP-discovered multi-hop topology is reachable in this environment; recorded this as an explicit limitation rather than fabricating topology data.
+- Confirmed real `topology.json` schema (`nodes`/`neighbors`/`edges`) produced by the existing pipeline is compatible with `build_troubleshooting_scope()` and PHASE-045's synthetic test fixtures.
+- Confirmed `--scope-depth` fallback behaviour (no pre-existing topology.json → scope = `[target_device]`) matches documented behaviour for both depth 2 and depth 3.
+- Confirmed `build_provenance.json` (DD-008) generates correctly alongside `--target-device`/`--scope-depth` collection.
+- Created docs/FieldEvidence/PHASE-046-20260903-fieldvalidation-findings.md and IMPLEMENTED-PHASE-046-MultiHopScopeFieldValidation.md.
+- No changes to app/scope.py, app/cli.py, or any other production code.
+
+Reason:
+- PHASE-046 acceptance criteria required validating multi-hop scoping against real topology data or explicitly documenting unavailability; no reachable multi-hop-capable device exists in this environment.
+
+Risks Introduced:
+- None (evidence-collection only).
+
+Risks Resolved:
+- None. Real multi-hop BFS traversal over actual discovered edges remains unverified pending a reachable device with genuine CDP/LLDP neighbours; this is recorded as an open, hardware-dependent limitation, not a defect.
+
+Next Recommended Action:
+- No remediation phase is warranted; PHASE-045/046 close the currently actionable work for Wishlist Phase 14. Await a reachable multi-hop-capable device before scheduling further field validation, or select the next highest-value phase from the roadmap.
+
 
