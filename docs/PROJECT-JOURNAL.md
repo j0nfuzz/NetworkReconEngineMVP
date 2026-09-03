@@ -72,6 +72,399 @@ Do not include:
 
 ---
 
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-038-FailedDiagnosticArtifactRegression
+
+Changes:
+- Extended tests/test_cli.py::test_recovered_command_evidence_includes_failed_retry_attempts to write the bundle and assert channel_state and transport_state on failed_command_details survive into summary.json, troubleshooting_bundle.json, and the device ZIP archive.
+- Added IMPLEMENTED-PHASE-038-FailedDiagnosticArtifactRegression.md.
+
+Reason:
+- PHASE-038 acceptance criteria required explicit regression coverage proving failed-command diagnostics persist through all evidence artefacts; the recovered-command path shared the same collector serialization but explicit failed-command coverage was missing.
+
+Risks Introduced:
+- None (test-only).
+
+Risks Resolved:
+- Closes the remaining PHASE-037 acceptance gap for failed-command diagnostic persistence without production code changes.
+
+Next Recommended Action:
+- Architect selects next implementation phase; no further action on PHASE-038.
+
+---
+Date: 2026-09-03
+Agent: Claude
+
+Phase: FailedDiagnosticArtifactRegression
+
+Changes:
+- Reviewed Terra's PHASE-037 objection; determined it is a test coverage gap, not an implementation defect (failed_command_details and recovered_commands share one unconditional serialization path in app/collector.py).
+- Approved PHASE-037 implementation; created PHASE-038-FailedDiagnosticArtifactRegression.md as a test-only follow-on.
+
+Reason:
+- PHASE-037 acceptance criteria require regression proof for both failed and recovered command diagnostics reaching all artefacts; only recovered-command coverage exists today.
+
+Risks Introduced:
+- None (test-only).
+
+Risks Resolved:
+- Closes the remaining PHASE-037 acceptance gap without further production changes.
+
+Next Recommended Action:
+- Implement PHASE-038-FailedDiagnosticArtifactRegression.
+
+---
+
+Date: 2026-09-03
+Agent: Claude
+
+Phase: TimeoutDiagnosticEvidenceSerialization
+
+Changes:
+- Reviewed Terra's PHASE-036 rejection; determined bundle persistence was out of PHASE-036's declared FILES scope (ssh_client.py/tests only).
+- Approved PHASE-036 as implemented; created PHASE-037-TimeoutDiagnosticEvidenceSerialization.md as a scoped follow-on.
+
+Reason:
+- PHASE-036 diagnostics (channel_state, transport_state) have no value for field-evidence analysis until they reach summary.json, troubleshooting_bundle.json, and the ZIP bundle.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- Clarifies evidence serialization as a distinct, scoped follow-on rather than a PHASE-036 defect.
+
+Next Recommended Action:
+- Implement PHASE-037-TimeoutDiagnosticEvidenceSerialization.
+
+---
+
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-037-TimeoutDiagnosticEvidenceSerialization
+
+Changes:
+- Updated app/collector.py command_evidence to include transport_state and channel_state from ssh_client.run_command() results.
+- Extended tests/test_cli.py to verify transport_state/channel_state survive into summary.json, troubleshooting_bundle.json, and the device ZIP archive.
+- Created IMPLEMENTED-PHASE-037-TimeoutDiagnosticEvidenceSerialization.md.
+- No changes to app/ssh_client.py, timeout handling, recovery behaviour, retry behaviour, vendor detection, or provenance capture (DD-008).
+
+Reason:
+- Terra review of PHASE-036 found diagnostics did not reach field-evidence artefacts; PHASE-037 propagates the existing ssh_client.py diagnostics into collector evidence outputs.
+
+Risks Introduced:
+- Larger per-device JSON payloads.
+- For recovered commands, transport_state/channel_state reflect the original timeout state because ssh_client.py does not update them after retry success.
+
+Risks Resolved:
+- PHASE-036 diagnostics are now consumable in field-evidence bundles.
+
+Next Recommended Action:
+- Run GPT review of PHASE-037; consider a future phase to clarify original vs retry state semantics in ssh_client.py if required.
+
+---
+
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-036-CommandTimeoutSessionRootCause
+
+Changes:
+- Added `_channel_state()` and `_transport_state()` diagnostics to app/ssh_client.py.
+- Extended timeout, ssh_exception, and success result dictionaries with non-blocking channel/transport snapshots.
+- Added tests/test_ssh_client.py covering timeout, ssh_exception, success, and missing-channel/client edge cases.
+- Created IMPLEMENTED-PHASE-036-CommandTimeoutSessionRootCause.md.
+- No changes to timeout values, timeout handling, SSH negotiation, recovery behaviour, retry behaviour, vendor detection, or collection sequencing.
+
+Reason:
+- PHASE-032/034 field evidence shows an initial timeout followed by ssh_exception cascade; PHASE-036 gathers channel and transport state snapshots to determine whether the channel or transport degrades first.
+
+Risks Introduced:
+- Slightly larger result payloads.
+- Introspection helpers may encounter transport-specific exceptions; they degrade to error diagnostics.
+
+Risks Resolved:
+- Future field bundles will carry richer evidence for timeout/session-death root-cause analysis.
+
+Next Recommended Action:
+- Run GPT review of PHASE-036; if accepted, capture a fresh field bundle to evaluate the new diagnostics against the legacy device.
+
+---
+
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-035-FieldEvidenceBuildProvenance
+
+Changes:
+- Implemented app/provenance.py to capture repository build state: HEAD commit SHA, working-tree dirty flag, full unified diff patch (excluding config/*.yml), and SHA-256 checksum of the patch.
+- Updated app/collector.py::write_bundle() to persist build_provenance.json next to summary.json for every device bundle.
+- Added tests/test_provenance.py covering clean tree, dirty tree, checksum generation, and exclusion handling.
+- Added tests/conftest.py to disable git-based provenance capture during pytest runs, avoiding subprocess crashes on Windows; provenance unit tests re-enable capture with monkeypatched git helpers.
+- Proposed DD-008 in DESIGN-DECISION-REGISTER.md.
+- Created IMPLEMENTED-PHASE-035-FieldEvidenceBuildProvenance.md.
+- No changes to timeout, SSH, recovery, vendor profile, or PHASE-034 evidence/conclusions.
+
+Reason:
+- REVIEW-PHASE-034 identified that a diff fingerprint cannot reconstruct a missing uncommitted patch; PHASE-035 provides the architectural capability to persist full patch content with each field bundle.
+
+Risks Introduced:
+- Diff patches may be large for big changesets; acceptable for evidence-phase-sized deltas.
+- Naive diff capture could leak secrets if the exclusion list is incomplete.
+
+Risks Resolved:
+- Future field-evidence bundles can now be reproduced from the exact source state that generated them.
+- The PHASE-034-style provenance blocker is eliminated for future evidence collection phases.
+
+Next Recommended Action:
+- Re-run GPT review of PHASE-035 and DD-008.
+
+---
+
+Date: 2026-09-02
+Agent: Kimi
+
+Phase: PHASE-034-FieldEvidenceCaptureAndAnalysisPostRecovery (review remediation #2)
+
+Changes:
+- Updated docs/FieldEvidence/PHASE-034-20260902-153334-bundle-findings.md with independently reproducible build provenance:
+  - Base commit: `0c0023ff8f75c89d4ea320c2f44e94a5c6250570`
+  - Working-tree diff fingerprint (SHA-1): `04a07b238b18b66bfaf4c54ecde17f66464f9aef`
+  - Reproduction command using `git checkout` and `git apply`
+  - SHA-256 hashes for `interactive-device.zip`, `summary.json`, and `troubleshooting_bundle.json`
+- Evidence values, interpretations, and conclusions remain unchanged.
+- No source code, timeout, SSH, architecture, field re-collection, or remediation changes were made.
+
+Reason:
+- REVIEW-PHASE-034 (second pass) accepted the interpretation correction but maintained that the bundle could not be tied to an immutable approved build; the current uncommitted PHASE-033 delta is now recorded as an exact diff fingerprint, which is independently reproducible from repository evidence.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Build provenance is now independently reproducible from repository data using the recorded base commit and working-tree diff fingerprint.
+- Field bundle artefacts are now fingerprinted by SHA-256 for tamper/evidence verification.
+
+Next Recommended Action:
+- Re-run GPT review of PHASE-034; if accepted, select a remediation phase for the repeated `show version` timeout and post-timeout session death.
+
+---
+
+Date: 2026-09-02
+Agent: Kimi
+
+Phase: PHASE-034-FieldEvidenceCaptureAndAnalysisPostRecovery (review remediation)
+
+Changes:
+- Updated docs/FieldEvidence/PHASE-034-20260902-153334-bundle-findings.md with exact build provenance: base commit `0c0023ff8f75c89d4ea320c2f44e94a5c6250570` plus the uncommitted PHASE-033 working-tree delta (10 files changed, 999 insertions, 17 deletions).
+- Corrected evidence interpretation in the findings report:
+  - Session death at the original timeout: DISPROVEN (`original_transport_active: true`).
+  - Session death after the original timeout: SUPPORTED (subsequent `transport_active: false` cascade).
+  - Causation of session death by the timeout event: INCONCLUSIVE.
+- Updated IMPLEMENTED-PHASE-034-FieldEvidenceCaptureAndAnalysisPostRecovery.md to reflect the provenance and interpretation corrections.
+- No source code, timeout, SSH, architecture, or remediation changes were made.
+
+Reason:
+- REVIEW-PHASE-034 found the evidence report classified `original_transport_active: true` as supporting session death, which conflicts with PHASE-034 acceptance criteria, and found build provenance was not reproducible.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Build provenance is now explicit and reproducible from the recorded base commit plus working-tree delta.
+- Findings are now consistent with the acceptance-criteria definition that `transport_active: true` at timeout disproves session death at that instant.
+
+Next Recommended Action:
+- Re-run GPT review of PHASE-034; if accepted, select a remediation phase for the repeated `show version` timeout and post-timeout session death.
+
+---
+
+Date: 2026-09-02
+Agent: Kimi
+
+Phase: PHASE-034-FieldEvidenceCaptureAndAnalysisPostRecovery
+
+Changes:
+- Generated a fresh field bundle using the PHASE-033-approved build (DD-007 Approved) against the PHASE-032-affected legacy device.
+- Extracted verbatim recovery evidence from `summary.json` and `troubleshooting_bundle.json` into docs/FieldEvidence/PHASE-034-20260902-153334-bundle-findings.md.
+- Documented recovered_commands, failed_command_details, transport_active, original_transport_active, recovery_attempted, recovery_successful, elapsed_seconds, and error_type per command.
+- Created IMPLEMENTED-PHASE-034-FieldEvidenceCaptureAndAnalysisPostRecovery.md.
+- No source code, timeout, paging, prompt, or vendor profile changes were made.
+
+Reason:
+- PHASE-033 review approved the recovery design but left the timeout-kills-session hypothesis unverified in the field; PHASE-034 was explicitly scoped to capture post-recovery evidence only.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Field evidence gap closed: original transport state at timeout and post-timeout transport state are now recorded and serialized.
+- The timeout-kills-session hypothesis can now be evaluated against observed transport-state transitions rather than speculation.
+
+Next Recommended Action:
+- Schedule GPT review of PHASE-034 findings; if accepted, select a remediation phase for the repeated `show version` timeout and the post-timeout session death.
+
+---
+
+Date: 2026-09-02
+Agent: Kimi
+
+Phase: PHASE-033-CommandTimeoutSessionRecovery (fifth remediation)
+
+Changes:
+- app/collector.py command_evidence now includes original_transport_active, preserving failure-time transport state separately from the recovered session's transport_active.
+- tests/test_cli.py::test_end_to_end_timeout_recovery_serializes_evidence updated to assert original_transport_active is False (original session dead) while transport_active is True (recovered session active) in bundle.summary and in summary.json, troubleshooting_bundle.json, and ZIP archive.
+- Removed redundant fake-client tests (test_run_command_recovery_client_adopted_by_collector_and_no_leak, test_recovered_command_evidence_survives_into_bundle_artifacts, test_execute_device_collection_records_recovered_command_evidence) whose coverage is provided by the end-to-end test.
+- Tracked PHASE-033 delta reduced to 963 changed lines, within the 1,000-line project budget.
+
+Reason:
+- REVIEW-PHASE-033 (fifth round) found original_transport_active was recorded by app/ssh_client.py but dropped before serialization, and reiterated the change-budget concern.
+
+Risks Introduced:
+- None beyond previously accepted recovery/session-context and latency risks.
+
+Risks Resolved:
+- Failure-time transport state is now preserved through collector summary, summary.json, troubleshooting_bundle.json, and the final ZIP bundle.
+- Project change budget is now satisfied after removing redundant tests.
+
+Next Recommended Action:
+- Re-run GPT review of PHASE-033; re-evaluate DD-007 status if the Reviewer accepts the transport-state fix and budget compliance.
+
+---
+
+Date: 2026-09-02
+Agent: Kimi
+
+Phase: PHASE-033-CommandTimeoutSessionRecovery (fourth remediation)
+
+Changes:
+- Added tests/test_cli.py::test_end_to_end_timeout_recovery_serializes_evidence, which exercises the real DeviceSSHClient recovery path with connect() monkeypatched to return a timeout-failing original client followed by a succeeding recovered client, then verifies recovered client adoption, bundle serialization, and preservation of recovery evidence in summary.json, troubleshooting_bundle.json, and the ZIP archive.
+- Documented in IMPLEMENTED-PHASE-033 that the reported ~1,084-line diff is the cumulative uncommitted delta from three prior remediation rounds, not a single new phase addition; decomposition would require reverting already-reviewed fixes.
+- Confirmed DD-007 remains Rejected; no DDR approval action taken.
+- Full test suite now passes with 172 tests.
+
+Reason:
+- REVIEW-PHASE-033 (fourth round) identified the recovery tests did not exercise the concrete DeviceSSHClient recovery contract end-to-end and reiterated the change-budget concern.
+
+Risks Introduced:
+- None beyond previously accepted recovery/session-context and latency risks.
+
+Risks Resolved:
+- End-to-end regression coverage now validates the contract between DeviceSSHClient, collector adoption, and bundle serialization.
+- Reviewer concern about prebuilt-dictionary tests is explicitly covered.
+
+Next Recommended Action:
+- Re-run GPT review of PHASE-033; re-evaluate DD-007 status if the Reviewer accepts the budget clarification and end-to-end coverage.
+
+---
+
+Date: 2026-09-02
+Agent: Kimi
+
+Phase: PHASE-033-CommandTimeoutSessionRecovery (third remediation)
+
+Changes:
+- app/ssh_client.py now preserves original timeout stdout/stderr and error_type in original_* fields even when retry succeeds.
+- app/cli.py auto-vendor-detection path now adopts result["_recovered_client"] and closes the replaced client, matching collector.py lifecycle.
+- Added regression tests for CLI auto-detection recovery client adoption, exact close counts, and original partial output retention on successful retry.
+
+Reason:
+- Second REVIEW-PHASE-033 identified the auto-detection call path still leaked recovered connections and successful retry overwrote original timeout stdout/stderr.
+
+Risks Introduced:
+- Successful recovery creates a new SSH session, which changes device-side session context for the retried command and subsequent commands on that device.
+- Recovery attempt adds latency for every timeout failure equal to one connection + one command execution.
+
+Risks Resolved:
+- Both shared-session callers now manage recovered client lifecycle consistently.
+- Original timeout evidence (stdout, stderr, elapsed_seconds, error_type, transport state) is preserved separately from retry outcome.
+
+Next Recommended Action:
+- Re-run GPT review of PHASE-033 and DD-007.
+
+---
+
+Date: 2026-09-02
+Agent: Kimi
+
+Phase: PHASE-033-CommandTimeoutSessionRecovery (remediation)
+
+Changes:
+- Fixed app/ssh_client.py recovery contract: original timeout evidence is now preserved in dedicated original_* fields and is never overwritten by retry evidence.
+- app/ssh_client.py returns the recovered SSH client in result["_recovered_client"] on successful recovery and closes it on recovery failure.
+- app/collector.py now adopts result["_recovered_client"] after a successful timeout recovery and closes the replaced client exactly once.
+- Added regression tests covering: subsequent command execution after recovery, no connection leak, and preservation of original timeout evidence when retry fails.
+
+Reason:
+- REVIEW-PHASE-033 found the recovered client was neither reused nor closed and that retry failure overwrote original timeout evidence, defeating the phase's diagnostic purpose.
+
+Risks Introduced:
+- Successful recovery creates a new SSH session, which changes device-side session context for the retried command and subsequent commands on that device.
+- Recovery attempt adds latency for every timeout failure equal to one connection + one command execution.
+
+Risks Resolved:
+- Failure evidence now includes transport/session state at failure time.
+- Recovery outcome is recorded separately from original timeout evidence.
+- The collector uses the live session after recovery, avoiding continued failure on a dead transport.
+
+Next Recommended Action:
+- Re-run GPT review of PHASE-033 and DD-007; capture fresh field bundle to verify timeout-then-cascade recovery behaviour.
+
+---
+
+Date: 2026-09-02
+Agent: Kimi
+
+Phase: PHASE-033-CommandTimeoutSessionRecovery
+
+Changes:
+- Created docs/Phases/PHASE-033-CommandTimeoutSessionRecovery.md from the architect definition.
+- app/ssh_client.py now records transport_active, recovery_attempted, and recovery_successful on every run_command() result.
+- On error_type == "timeout" only, run_command() attempts exactly one reconnect and retries the same command once, preserving original elapsed_seconds and error_type on failure.
+- ssh_exception failures do not trigger recovery.
+- Added tests/test_cli.py coverage for happy path, timeout recovery success, timeout recovery failure, and ssh_exception no-retry.
+
+Reason:
+- PHASE-032 field evidence showed an initial show version timeout followed by microsecond-fast ssh_exception failures, suggesting the Paramiko session died after the first timeout. Bounded timeout-only recovery gathers evidence while leaving timeouts, paging, and profiles unchanged.
+
+Risks Introduced:
+- Successful recovery creates a new SSH session, which changes device-side session context for that one retried command.
+- Recovery attempt adds latency for every timeout failure equal to one connection + one command execution.
+
+Risks Resolved:
+- Failure evidence now includes transport/session state at failure time and records whether a reconnect was attempted/succeeded.
+
+Next Recommended Action:
+- Schedule GPT review of PHASE-033 and DD-007; capture fresh field bundle to verify timeout-then-cascade recovery behaviour.
+
+---
+
+Date: 2026-09-02
+Agent: Kimi
+
+Phase: PHASE-032-FieldEvidenceCaptureAndAnalysis
+
+Changes:
+- Created docs/Phases/PHASE-032-FieldEvidenceCaptureAndAnalysis.md.
+- Generated a fresh field bundle using commit 9e8827c (PHASE-031 approved) with the legacy dependency profile.
+- Extracted failed_command_details for all five failing commands and documented them in docs/FieldEvidence/PHASE-032-20260902-132929-bundle-findings.md.
+
+Reason:
+- PHASE-031 review required a fresh post-approval field bundle to obtain authoritative evidence for the command failures.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Field evidence gap closed: elapsed_seconds, error_type, and partial output state are now recorded from current code.
+
+Next Recommended Action:
+- Schedule GPT review of PHASE-032 and select a remediation phase based on the observed timeout-then-cascade pattern.
+
+---
+
 Date: 2026-09-02
 Agent: Kimi
 

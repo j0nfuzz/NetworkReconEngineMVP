@@ -648,6 +648,463 @@ def test_run_command_preserves_partial_stderr_on_ssh_exception():
     assert "partial error" in result["stderr"]
 
 
+def test_run_command_records_transport_state_fields_on_success():
+    class FakeChannel:
+        def recv_exit_status(self):
+            return 0
+
+    class FakeTransport:
+        def is_active(self):
+            return True
+
+    class FakeStdout:
+        channel = FakeChannel()
+
+        def read(self):
+            return b"ok"
+
+    class FakeStderr:
+        channel = FakeChannel()
+
+        def read(self):
+            return b""
+
+    class FakeSSHClient:
+        def __init__(self):
+            self._transport = FakeTransport()
+
+        def exec_command(self, command, timeout=None):
+            return None, FakeStdout(), FakeStderr()
+
+        def get_transport(self):
+            return self._transport
+
+    client = DeviceSSHClient("device.example", "user", "pass")
+    result = client.run_command("show version", client=FakeSSHClient())
+
+    assert result["success"] is True
+    assert result["transport_active"] is True
+    assert result["recovery_attempted"] is False
+    assert result["recovery_successful"] is None
+
+
+def test_run_command_recovers_from_timeout_on_retry():
+    class FakeTransport:
+        def is_active(self):
+            return False
+
+    class FailingStdout:
+        channel = None
+
+        def read(self):
+            raise socket.timeout("Command timed out")
+
+    class SucceedingStdout:
+        class _Channel:
+            def recv_exit_status(self):
+                return 0
+
+        channel = _Channel()
+
+        def read(self):
+            return b"recovered output"
+
+    class FailingStderr:
+        channel = None
+
+        def read(self):
+            return b""
+
+    class SucceedingStderr:
+        channel = SucceedingStdout._Channel()
+
+        def read(self):
+            return b""
+
+    class FailingSSHClient:
+        _transport = FakeTransport()
+
+        def exec_command(self, command, timeout=None):
+            return None, FailingStdout(), FailingStderr()
+
+        def get_transport(self):
+            return self._transport
+
+    class SucceedingSSHClient:
+        _transport = FakeTransport()
+
+        def exec_command(self, command, timeout=None):
+            return None, SucceedingStdout(), SucceedingStderr()
+
+        def get_transport(self):
+            return self._transport
+
+    client = DeviceSSHClient("device.example", "user", "pass")
+
+    original_connect = client.connect
+    call_count = {"n": 0}
+
+    def fake_connect():
+        call_count["n"] += 1
+        return SucceedingSSHClient()
+
+    client.connect = fake_connect
+    result = client.run_command("show version", client=FailingSSHClient())
+
+    assert result["success"] is True
+    assert result["stdout"] == "recovered output"
+    assert result["recovery_attempted"] is True
+    assert result["recovery_successful"] is True
+    assert result.get("original_elapsed_seconds") is not None
+    assert result.get("original_stdout") is not None
+    assert result.get("_recovered_client") is not None
+    assert call_count["n"] == 1
+
+    client.connect = original_connect
+
+
+def test_run_command_recovery_preserves_original_timeout_partial_output_on_success():
+    class FakeChannel:
+        def __init__(self):
+            self._stdout_buffer = b"partial version line\n"
+            self._stderr_buffer = b"partial error line\n"
+
+        def recv_ready(self):
+            return len(self._stdout_buffer) > 0
+
+        def recv(self, nbytes):
+            data = self._stdout_buffer
+            self._stdout_buffer = b""
+            return data
+
+        def recv_stderr_ready(self):
+            return len(self._stderr_buffer) > 0
+
+        def recv_stderr(self, nbytes):
+            data = self._stderr_buffer
+            self._stderr_buffer = b""
+            return data
+
+    class FakeTransport:
+        def is_active(self):
+            return False
+
+    class TimeoutStdout:
+        def __init__(self):
+            self.channel = FakeChannel()
+
+        def read(self):
+            raise socket.timeout("Command timed out")
+
+    class FailingStderr:
+        def __init__(self):
+            self.channel = FakeChannel()
+
+        def read(self):
+            return b""
+
+    class SucceedingChannel:
+        def recv_exit_status(self):
+            return 0
+
+    class SucceedingStdout:
+        channel = SucceedingChannel()
+
+        def read(self):
+            return b"full version output"
+
+    class SucceedingStderr:
+        channel = SucceedingChannel()
+
+        def read(self):
+            return b""
+
+    class FailingSSHClient:
+        _transport = FakeTransport()
+
+        def exec_command(self, command, timeout=None):
+            return None, TimeoutStdout(), FailingStderr()
+
+        def get_transport(self):
+            return self._transport
+
+    class RecoveredSSHClient:
+        _transport = FakeTransport()
+
+        def exec_command(self, command, timeout=None):
+            return None, SucceedingStdout(), SucceedingStderr()
+
+        def get_transport(self):
+            return self._transport
+
+    client = DeviceSSHClient("device.example", "user", "pass")
+    client.connect = lambda: RecoveredSSHClient()
+    result = client.run_command("show version", client=FailingSSHClient())
+
+    assert result["success"] is True
+    assert result["stdout"] == "full version output"
+    assert "partial version line" in result["original_stdout"]
+    assert "partial error line" in result["original_stderr"]
+    assert result.get("retry_stdout") == "full version output"
+    assert result.get("original_error_type") == "timeout"
+    assert result.get("_recovered_client") is not None
+
+
+def test_run_command_recovery_preserves_original_timeout_evidence_on_retry_failure():
+    class FakeTransport:
+        def is_active(self):
+            return False
+
+    class FailingStdout:
+        channel = None
+
+        def read(self):
+            raise socket.timeout("Command timed out")
+
+    class FailingStderr:
+        channel = None
+
+        def read(self):
+            return b""
+
+    class FailingSSHClient:
+        _transport = FakeTransport()
+
+        def exec_command(self, command, timeout=None):
+            return None, FailingStdout(), FailingStderr()
+
+        def get_transport(self):
+            return self._transport
+
+    class RecoveredFailingSSHClient:
+        _transport = FakeTransport()
+
+        def exec_command(self, command, timeout=None):
+            raise paramiko.SSHException("channel closed after reconnect")
+
+        def get_transport(self):
+            return self._transport
+
+    client = DeviceSSHClient("device.example", "user", "pass")
+    client.connect = lambda: RecoveredFailingSSHClient()
+    result = client.run_command("show version", client=FailingSSHClient())
+
+    assert result["success"] is False
+    assert result["error_type"] == "timeout"
+    assert result["recovery_attempted"] is True
+    assert result["recovery_successful"] is False
+    assert result.get("original_error_type") == "timeout" or result["error_type"] == "timeout"
+    assert result.get("retry_error_type") == "ssh_exception"
+    assert result.get("original_elapsed_seconds") is not None
+    assert result.get("_recovered_client") is None
+
+
+def test_run_command_records_recovery_failure_after_timeout():
+    class FakeTransport:
+        def is_active(self):
+            return False
+
+    class FailingStdout:
+        channel = None
+
+        def read(self):
+            raise socket.timeout("Command timed out")
+
+    class FailingStderr:
+        channel = None
+
+        def read(self):
+            return b""
+
+    class FailingSSHClient:
+        _transport = FakeTransport()
+
+        def exec_command(self, command, timeout=None):
+            return None, FailingStdout(), FailingStderr()
+
+        def get_transport(self):
+            return self._transport
+
+    client = DeviceSSHClient("device.example", "user", "pass")
+    client.connect = lambda: (_ for _ in ()).throw(paramiko.SSHException("dead"))
+    result = client.run_command("show version", client=FailingSSHClient())
+
+    assert result["success"] is False
+    assert result["error_type"] == "timeout"
+    assert result["recovery_attempted"] is True
+    assert result["recovery_successful"] is False
+    assert result.get("original_elapsed_seconds") is not None
+    assert "dead" in result["retry_error"] or "dead" in result["error"]
+
+
+def test_run_command_does_not_retry_ssh_exception():
+    class FakeTransport:
+        def is_active(self):
+            return False
+
+    class FailingSSHClient:
+        _transport = FakeTransport()
+
+        def exec_command(self, command, timeout=None):
+            raise paramiko.SSHException("channel closed")
+
+        def get_transport(self):
+            return self._transport
+
+    client = DeviceSSHClient("device.example", "user", "pass")
+    client.connect = lambda: (_ for _ in ()).throw(RuntimeError("should not reconnect"))
+    result = client.run_command("show version", client=FailingSSHClient())
+
+    assert result["success"] is False
+    assert result["error_type"] == "ssh_exception"
+    assert result["recovery_attempted"] is False
+    assert result["recovery_successful"] is None
+    assert result["transport_active"] is False
+
+
+def test_cli_auto_detect_adopts_recovered_client_and_closes_both(monkeypatch, tmp_path):
+    import argparse
+    import app.cli as cli_module
+
+    class FakeTransport:
+        def is_active(self):
+            return True
+
+    class SucceedingChannel:
+        def recv_exit_status(self):
+            return 0
+
+    class SucceedingStdout:
+        channel = SucceedingChannel()
+
+        def read(self):
+            return b"Cisco IOS Software"
+
+    class SucceedingStderr:
+        channel = SucceedingChannel()
+
+        def read(self):
+            return b""
+
+    class DeadChannel:
+        def recv_exit_status(self):
+            return -1
+
+    class TimeoutStdout:
+        channel = DeadChannel()
+
+        def read(self):
+            raise socket.timeout("Command timed out")
+
+    class FailingStderr:
+        channel = DeadChannel()
+
+        def read(self):
+            return b""
+
+    closed_clients = []
+
+    class OriginalSSHClient:
+        _transport = FakeTransport()
+
+        def exec_command(self, command, timeout=None):
+            return None, TimeoutStdout(), FailingStderr()
+
+        def get_transport(self):
+            return self._transport
+
+        def close(self):
+            closed_clients.append("original")
+
+    class RecoveredSSHClient:
+        _transport = FakeTransport()
+
+        def exec_command(self, command, timeout=None):
+            return None, SucceedingStdout(), SucceedingStderr()
+
+        def get_transport(self):
+            return self._transport
+
+        def close(self):
+            closed_clients.append("recovered")
+
+    class FakeSSHClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def probe(self):
+            return {"reachable": True, "status": "connected"}
+
+        def connect(self):
+            return OriginalSSHClient()
+
+        def run_command(self, command, *, client=None):
+            if isinstance(client, OriginalSSHClient):
+                return {
+                    "command": command,
+                    "stdout": "Cisco IOS Software",
+                    "stderr": "",
+                    "exit_code": 0,
+                    "success": True,
+                    "error": None,
+                    "elapsed_seconds": 0.2,
+                    "transport_active": True,
+                    "recovery_attempted": True,
+                    "recovery_successful": True,
+                    "original_elapsed_seconds": 15.0,
+                    "_recovered_client": RecoveredSSHClient(),
+                }
+            return {
+                "command": command,
+                "stdout": "Cisco IOS Software",
+                "stderr": "",
+                "exit_code": 0,
+                "success": True,
+                "error": None,
+                "elapsed_seconds": 0.1,
+            }
+
+        def close(self, client):
+            if client is not None:
+                client.close()
+
+    monkeypatch.setattr("app.ssh_client.DeviceSSHClient", FakeSSHClient)
+    monkeypatch.setattr(cli_module, "identify_device", lambda output: type("I", (), {
+        "vendor": "cisco", "platform": "ios", "model": "unknown", "confidence": 1.0,
+    })())
+    monkeypatch.setattr(cli_module, "classify_role", lambda identity, name: type("R", (), {
+        "role": "switch", "confidence": 1.0,
+    })())
+    monkeypatch.setattr(cli_module, "execute_device_collection", lambda device, dry_run=False: type("B", (), {
+        "summary": {"status": "collected"},
+        "raw_outputs": {},
+        "failed_commands": [],
+    })())
+    monkeypatch.setattr(cli_module, "write_bundle", lambda bundle, output_root: output_root)
+
+    from app.models import Device
+    device = Device(
+        name="lab-switch",
+        hostname="10.0.0.12",
+        vendor="auto",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+    args = argparse.Namespace(
+        dry_run=False,
+        recursive=False,
+        checkpoint_file=None,
+        target_device=None,
+        max_concurrent=5,
+    )
+    cli_module._run_cli_collection(args, [device], "", tmp_path, verbose=False)
+
+    assert "original" in closed_clients
+    assert "recovered" in closed_clients
+    assert closed_clients.count("original") == 1
+    assert closed_clients.count("recovered") == 1
+
+
 def test_execute_device_collection_records_failed_command_evidence(monkeypatch):
     commands = ["show version"]
     monkeypatch.setattr("app.collector.get_vendor_commands", lambda vendor, role=None: commands)
@@ -1957,4 +2414,227 @@ def test_failed_command_partial_output_survives_in_bundle_artifacts(tmp_path):
     with zipfile.ZipFile(device_dir.with_suffix(".zip"), "r") as zf:
         archived_artifact = zf.read("show_interfaces.txt")
     assert archived_artifact == artifact_bytes
+
+
+def test_recovered_command_evidence_includes_failed_retry_attempts(monkeypatch, tmp_path):
+    """PHASE-033: a timeout followed by a failed retry is recorded in failed_command_details with original evidence."""
+    commands = ["show version"]
+    monkeypatch.setattr("app.collector.get_vendor_commands", lambda vendor, role=None: commands)
+
+    class FakeSSHClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def probe(self):
+            return {"reachable": True, "status": "connected"}
+
+        def connect(self):
+            return object()
+
+        def close(self, client):
+            return None
+
+        def run_command(self, command, *, client=None):
+            return {
+                "command": command,
+                "stdout": "partial output",
+                "stderr": "",
+                "exit_code": -1,
+                "success": False,
+                "error": "Command timed out or failed: timeout",
+                "elapsed_seconds": 20.0,
+                "error_type": "timeout",
+                "transport_active": False,
+                "transport_state": {"exists": True, "active": False},
+                "channel_state": {"exists": True, "closed": True},
+                "recovery_attempted": True,
+                "recovery_successful": False,
+                "original_error_type": "timeout",
+                "original_elapsed_seconds": 15.0,
+                "original_stdout": "partial output",
+                "original_stderr": "",
+                "retry_error": "Command timed out or failed: timeout",
+                "retry_error_type": "timeout",
+                "retry_elapsed_seconds": 5.0,
+            }
+
+    monkeypatch.setattr(collector_module, "DeviceSSHClient", FakeSSHClient)
+
+    device = Device(
+        name="lab-switch",
+        hostname="10.0.0.12",
+        vendor="cisco",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    bundle = execute_device_collection(device, dry_run=False)
+
+    assert bundle.summary["status"] == "partial"
+    assert bundle.summary["failed_commands"] == commands
+    assert len(bundle.summary["failed_command_details"]) == 1
+    assert bundle.summary["recovered_commands"] == []
+    detail = bundle.summary["failed_command_details"][0]
+    assert detail["recovery_attempted"] is True
+    assert detail["recovery_successful"] is False
+    assert detail["original_error_type"] == "timeout"
+    assert detail["original_stdout"] == "partial output"
+    assert detail["retry_error_type"] == "timeout"
+    assert detail["retry_elapsed_seconds"] == 5.0
+    assert detail["transport_state"] == {"exists": True, "active": False}
+    assert detail["channel_state"] == {"exists": True, "closed": True}
+
+    device_dir = write_bundle(bundle, tmp_path)
+    summary_payload = json.loads((device_dir / "summary.json").read_text(encoding="utf-8"))
+    troubleshooting_payload = json.loads((device_dir / "troubleshooting_bundle.json").read_text(encoding="utf-8"))
+
+    failed_detail = summary_payload["failed_command_details"][0]
+    assert failed_detail["transport_state"] == {"exists": True, "active": False}
+    assert failed_detail["channel_state"] == {"exists": True, "closed": True}
+    assert troubleshooting_payload["failed_command_details"][0]["transport_state"] == {"exists": True, "active": False}
+    assert troubleshooting_payload["failed_command_details"][0]["channel_state"] == {"exists": True, "closed": True}
+
+    with zipfile.ZipFile(device_dir.with_suffix(".zip"), "r") as zf:
+        archived_summary = json.loads(zf.read("summary.json"))
+        archived_troubleshooting = json.loads(zf.read("troubleshooting_bundle.json"))
+    assert archived_summary["failed_command_details"][0]["transport_state"] == {"exists": True, "active": False}
+    assert archived_summary["failed_command_details"][0]["channel_state"] == {"exists": True, "closed": True}
+    assert archived_troubleshooting["failed_command_details"][0]["transport_state"] == {"exists": True, "active": False}
+    assert archived_troubleshooting["failed_command_details"][0]["channel_state"] == {"exists": True, "closed": True}
+
+
+def test_end_to_end_timeout_recovery_serializes_evidence(monkeypatch, tmp_path):
+    """PHASE-033 end-to-end: real DeviceSSHClient recovery, caller adoption, and artefact serialization."""
+    closed_clients: list[str] = []
+
+    class FakeTransport:
+        def __init__(self, active: bool):
+            self._active = active
+
+        def is_active(self):
+            return self._active
+
+    class TimeoutStdout:
+        channel = None
+
+        def read(self):
+            raise socket.timeout("Command timed out")
+
+    class EmptyStderr:
+        channel = None
+
+        def read(self):
+            return b""
+
+    class OriginalClient:
+        _transport = FakeTransport(False)
+
+        def exec_command(self, command, timeout=None):
+            return None, TimeoutStdout(), EmptyStderr()
+
+        def get_transport(self):
+            return self._transport
+
+        def close(self):
+            if "original" not in closed_clients:
+                closed_clients.append("original")
+
+    class RecoveredChannel:
+        active = True
+        eof_received = False
+        closed = False
+
+        def recv_exit_status(self):
+            return 0
+
+        def exit_status_ready(self):
+            return True
+
+        def recv_ready(self):
+            return False
+
+        def recv_stderr_ready(self):
+            return False
+
+    class RecoveredStdout:
+        channel = RecoveredChannel()
+
+        def read(self):
+            return b"Cisco IOS XE Software, Version 17.09.04"
+
+    class RecoveredStderr:
+        channel = RecoveredChannel()
+
+        def read(self):
+            return b""
+
+    class RecoveredClient:
+        _transport = FakeTransport(True)
+
+        def exec_command(self, command, timeout=None):
+            return None, RecoveredStdout(), RecoveredStderr()
+
+        def get_transport(self):
+            return self._transport
+
+        def close(self):
+            if "recovered" not in closed_clients:
+                closed_clients.append("recovered")
+
+    connect_calls: list[str] = []
+
+    def fake_connect(self):
+        if not connect_calls:
+            connect_calls.append("original")
+            return OriginalClient()
+        connect_calls.append("recovered")
+        return RecoveredClient()
+
+    monkeypatch.setattr(DeviceSSHClient, "connect", fake_connect)
+    monkeypatch.setattr(DeviceSSHClient, "probe", lambda self: {"reachable": True, "status": "connected"})
+    monkeypatch.setattr("app.collector.get_vendor_commands", lambda vendor, role=None: ["show version"])
+
+    device = Device(
+        name="e2e-switch",
+        hostname="10.0.0.99",
+        vendor="cisco",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    bundle = execute_device_collection(device, dry_run=False)
+    device_dir = write_bundle(bundle, tmp_path)
+
+    assert bundle.summary["status"] == "collected"
+    assert bundle.summary["commands_run"] == 1
+    assert bundle.raw_outputs["show version"] == "Cisco IOS XE Software, Version 17.09.04"
+    assert "original" in closed_clients
+    assert "recovered" in closed_clients
+
+    recovered = bundle.summary["recovered_commands"]
+    assert len(recovered) == 1
+    evidence = recovered[0]
+    assert evidence["command"] == "show version"
+    assert evidence["recovery_attempted"] is True
+    assert evidence["recovery_successful"] is True
+    assert evidence["original_error_type"] == "timeout"
+    assert evidence["original_elapsed_seconds"] is not None
+    assert evidence["original_transport_active"] is False
+    assert evidence["transport_active"] is True
+    assert "transport_state" in evidence
+    assert "channel_state" in evidence
+
+    summary_payload = json.loads((device_dir / "summary.json").read_text(encoding="utf-8"))
+    troubleshooting_payload = json.loads((device_dir / "troubleshooting_bundle.json").read_text(encoding="utf-8"))
+    assert summary_payload["recovered_commands"] == recovered
+    assert troubleshooting_payload["recovered_commands"] == recovered
+    assert summary_payload["recovered_commands"][0]["transport_state"]["exists"] is True
+
+    with zipfile.ZipFile(device_dir.with_suffix(".zip"), "r") as zf:
+        archived_summary = json.loads(zf.read("summary.json"))
+        archived_troubleshooting = json.loads(zf.read("troubleshooting_bundle.json"))
+    assert archived_summary["recovered_commands"] == recovered
+    assert archived_troubleshooting["recovered_commands"] == recovered
+    assert "channel_state" in archived_summary["recovered_commands"][0]
+    assert "transport_state" in archived_summary["recovered_commands"][0]
 
