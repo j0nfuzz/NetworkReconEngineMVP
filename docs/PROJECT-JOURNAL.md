@@ -2518,3 +2518,32 @@ Risks Resolved:
 Next Recommended Action:
 - Implement PHASE-042-EnvironmentCredentialSubstitution and review proposed DD-010.
 
+---
+
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-042-EnvironmentCredentialSubstitution
+
+Changes:
+- Added `_resolve_credential_value()` to app/config.py to resolve exact `${ENV_VAR}` references in credential fields.
+- Updated `load_default_credentials()` and `load_devices()` to resolve placeholders before existing default/device credential merging.
+- Added tests/test_config_env_substitution.py covering successful substitution, missing variables, mixed literals, inheritance, and backward compatibility.
+- Updated config/devices.yml.example and README.md to document environment-variable credentials.
+- Approved DD-010 in DESIGN-DECISION-REGISTER.md.
+- Created IMPLEMENTED-PHASE-042-EnvironmentCredentialSubstitution.md.
+
+Reason:
+- PHASE-042 acceptance criteria required secret-free tracked templates and a secure credential source while preserving existing configuration semantics.
+
+Risks Introduced:
+- Environment variables can be inspected by privileged local processes.
+- Operators must set referenced variables before collection.
+
+Risks Resolved:
+- Credentials no longer need to be stored as plaintext in local YAML files.
+- PHASE-041 example templates can now reference environment variables.
+
+Next Recommended Action:
+- Run GPT review of PHASE-042 and approved DD-010.
+

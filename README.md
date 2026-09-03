@@ -106,6 +106,24 @@ devices:
 
 `config/*.yml` files are gitignored to prevent accidental commits of credentials; only `*.example` templates are tracked.
 
+You can also reference environment variables for any credential field using the exact form `${ENV_VAR_NAME}`:
+
+```yaml
+default:
+  username: admin
+  password: "<PASSWORD>"
+
+devices:
+  - name: access-switch-01
+    hostname: 10.0.0.10
+    vendor: aruba
+    port: 22
+    username: ${NRE_SWITCH_USERNAME}
+    password: "<PASSWORD>"
+```
+
+If a referenced environment variable is missing, the tool will report a clear error before attempting any connection.
+
 Then run a dry validation:
 
 ```powershell

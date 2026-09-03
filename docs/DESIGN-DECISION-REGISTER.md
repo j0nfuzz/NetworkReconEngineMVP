@@ -332,7 +332,10 @@ Reason:
 Enables secret-free tracked templates while preserving current YAML configuration and deterministic device-level overrides.
 
 Status:
-Proposed
+Approved
+
+Approver:
+GPT Reviewer
 
 Date:
 2026-09-03
