@@ -88,7 +88,11 @@ You can also skip the dependency reinstall step on repeat runs:
 
 ### Option 3: direct CLI run with an inventory file
 
-Create or update `config/devices.yml`:
+Copy `config/devices.yml.example` to `config/devices.yml` and edit it with your device details:
+
+```powershell
+Copy-Item config\devices.yml.example config\devices.yml
+```
 
 ```yaml
 devices:
@@ -99,6 +103,8 @@ devices:
     username: admin
     password: "<PASSWORD>"
 ```
+
+`config/*.yml` files are gitignored to prevent accidental commits of credentials; only `*.example` templates are tracked.
 
 Then run a dry validation:
 

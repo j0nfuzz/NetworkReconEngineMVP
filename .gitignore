@@ -29,9 +29,13 @@ Thumbs.db
 output/
 live_output/
 demo_output/
-config/interactive_devices.yml
 test_bootstrap/
 field_tests/
+field_output_040/
+
+# Secret-bearing device configs (use *.example templates)
+config/*.yml
+!config/*.yml.example
 
 # Packaged distribution artefacts
 *.zip
