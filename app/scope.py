@@ -1,22 +1,40 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from collections import deque
+from typing import Any, Dict, List, Set
 
 
-def build_troubleshooting_scope(topology: Dict[str, Any], target: str) -> List[str]:
-    """Return a deterministic single-hop troubleshooting scope for a target device.
+def build_troubleshooting_scope(
+    topology: Dict[str, Any], target: str, hops: int = 1
+) -> List[str]:
+    """Return a deterministic troubleshooting scope for a target device.
 
-    The scope contains the target device and its direct neighbours from the
-    topology graph. If the target is unknown, a target-only scope is returned
-    so callers can still attempt to collect it without raising.
+    Performs a breadth-first traversal out to *hops* edges from *target*,
+    returning the sorted union of all nodes visited within that radius.  The
+    traversal is cycle-safe and terminates on loops.  If the target is unknown,
+    a target-only scope is returned so callers can still attempt to collect it
+    without raising.
     """
     nodes = topology.get("nodes", {}) or {}
     if target not in nodes:
         return [target]
 
-    scope = {target}
-    for neighbor in nodes[target].get("neighbors", []) or []:
-        if neighbor:
-            scope.add(neighbor)
+    if hops <= 0:
+        return [target]
 
-    return sorted(scope)
+    visited: Set[str] = {target}
+    queue: deque[tuple[str, int]] = deque([(target, 0)])
+
+    while queue:
+        current, distance = queue.popleft()
+        if distance >= hops:
+            continue
+        for neighbor in nodes.get(current, {}).get("neighbors", []) or []:
+            if not neighbor:
+                continue
+            if neighbor in visited:
+                continue
+            visited.add(neighbor)
+            queue.append((neighbor, distance + 1))
+
+    return sorted(visited)

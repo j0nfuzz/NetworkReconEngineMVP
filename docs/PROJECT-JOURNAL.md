@@ -2652,4 +2652,59 @@ Risks Resolved:
 Next Recommended Action:
 - Run GPT review of PHASE-044 and the re-proposed DD-010.
 
+---
+
+Date: 2026-09-03
+Agent: Claude
+
+Phase: MultiHopTroubleshootingScope
+
+Changes:
+- Confirmed PHASE-044 closure: Terra approved, DD-010 approved, 200 tests passing, stable checkpoint achieved.
+- Confirmed Wishlist Item 8 (Credential Management) is now complete: default/override credentials, environment-variable substitution, and containment-based malformed-placeholder validation are all implemented and reviewed (PHASE-008, PHASE-042/043/044); only vault/keyring integration remains, and Wishlist explicitly marks that as future work, not a current requirement.
+- Reviewed docs/Wishlist.md end to end against implemented phases: Phases 1-13 and 16-18 are fully implemented and reviewed; Phase 14 (Topology-Aware Troubleshooting) is only partially implemented.
+- Identified that PHASE-017's `build_troubleshooting_scope()` is single-hop only (target plus direct neighbours), a limitation explicitly flagged as an outstanding risk in PHASE-017 and PHASE-017A and never remediated. Wishlist Phase 14's own worked example (`AP12 -> SW02 -> SW01 -> FW01`) is a 3-hop chain that the current single-hop scope cannot satisfy.
+- Selected multi-hop scoping as the next phase: it is a direct capability gap against an existing Wishlist item's own acceptance example, not remediation, hygiene, git, review-process, credential-management, or timeout-investigation work.
+- Created PHASE-045-MultiHopTroubleshootingScope.md.
+
+Reason:
+- Closing the single-hop limitation delivers the exact capability Wishlist Phase 14 describes and resolves a risk carried unaddressed since PHASE-017, ranking above further credential-management or timeout work per the explicit instruction to prefer capability delivery.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; PHASE-045 is scoped to resolve the long-carried single-hop scoping risk once implemented.
+
+Next Recommended Action:
+- Implement PHASE-045-MultiHopTroubleshootingScope.
+
+---
+
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-045-MultiHopTroubleshootingScope
+
+Changes:
+- Added optional `hops` parameter to `build_troubleshooting_scope()` in app/scope.py; default `hops=1` preserves the existing single-hop scope.
+- Implemented bounded, cycle-safe breadth-first traversal out to `hops` edges, returning a deterministic sorted union of visited nodes.
+- `hops=0` and negative values return target-only; unknown targets still return `[target]` without raising.
+- Added `--scope-depth` CLI flag in app/cli.py (default `1`) that is passed through as `hops` only when `--target-device` is supplied.
+- Added regression tests in tests/test_scope.py for `hops=0`, 2-hop traversal, 3-hop chain traversal, cycle prevention, disconnected segments, unknown target with hops, negative hops, deterministic multi-hop output, and CLI wiring of `--scope-depth`.
+- Created docs/Phases/IMPLEMENTED-PHASE-045-MultiHopTroubleshootingScope.md.
+
+Reason:
+- PHASE-045 acceptance criteria require multi-hop, cycle-safe, bounded topology scoping while keeping the existing default single-hop behaviour intact.
+
+Risks Introduced:
+- Large `--scope-depth` values on dense topologies can expand the scoped device set significantly; this is an explicit engineer-controlled trade-off.
+
+Risks Resolved:
+- Wishlist Phase 14's worked multi-hop example (`AP12 -> SW02 -> SW01 -> FW01`) is now representable.
+- Single-hop default behaviour and all existing tests remain unchanged.
+
+Next Recommended Action:
+- Run GPT review of PHASE-045 and DD-011.
+
 

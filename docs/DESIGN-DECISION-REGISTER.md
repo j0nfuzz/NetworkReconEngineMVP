@@ -342,3 +342,25 @@ Date:
 
 Phase:
 PHASE-044-MalformedCredentialPlaceholderDetectionRemediation
+
+---
+
+Decision ID: DD-011
+
+Decision:
+`build_troubleshooting_scope()` accepts an optional `hops` parameter (default `1`, preserving current behaviour) that performs bounded, cycle-safe breadth-first traversal to the requested depth; CLI exposes this as `--scope-depth`, engineer-controlled and only active alongside `--target-device`.
+
+Reason:
+Wishlist Phase 14's own worked example requires multi-hop scoping (a 3-hop device chain); single-hop scoping has been an unaddressed risk since PHASE-017. Making depth an explicit, opt-in parameter preserves default behaviour and existing tests while unlocking the required capability.
+
+Status:
+Proposed
+
+Approver:
+Pending GPT Reviewer approval
+
+Date:
+2026-09-03
+
+Phase:
+PHASE-045-MultiHopTroubleshootingScope

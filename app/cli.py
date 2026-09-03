@@ -68,7 +68,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--probe", action="store_true", help="Probe device(s), report reachability/legacy classification, then exit")
     parser.add_argument("--recursive", action="store_true", help="Collect recursively from the first configured device")
     parser.add_argument("--checkpoint-file", default=None, help="Path to JSON checkpoint file for resume/recursive runs")
-    parser.add_argument("--target-device", default=None, help="Limit recursive collection to this device and its direct topology neighbours")
+    parser.add_argument("--target-device", default=None, help="Limit recursive collection to this device and its topology neighbours")
+    parser.add_argument(
+        "--scope-depth",
+        type=int,
+        default=1,
+        help="Topology radius for --target-device scoping (default 1; no effect without --target-device)",
+    )
     parser.add_argument(
         "--max-concurrent",
         type=int,
@@ -88,6 +94,7 @@ def _run_recursive_cli(
     checkpoint_file: str | None,
     dry_run: bool,
     target_device: str | None,
+    scope_depth: int = 1,
     max_concurrent: int = 5,
 ) -> None:
     """Run recursive collection from a seed device and populate bundle_summary."""
@@ -119,7 +126,9 @@ def _run_recursive_cli(
         topology_path = output_root / "topology.json"
         if topology_path.exists():
             topology = json.loads(topology_path.read_text(encoding="utf-8"))
-            scope = build_troubleshooting_scope(topology, target_device)
+            scope = build_troubleshooting_scope(
+                topology, target_device, hops=scope_depth
+            )
         else:
             scope = [target_device]
         allowed_devices = set(scope)
@@ -247,6 +256,7 @@ def _run_cli_collection(
             checkpoint_file=args.checkpoint_file,
             dry_run=args.dry_run,
             target_device=args.target_device,
+            scope_depth=args.scope_depth,
             max_concurrent=args.max_concurrent,
         )
     else:
