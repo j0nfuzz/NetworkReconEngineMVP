@@ -2493,3 +2493,28 @@ Risks Resolved:
 Next Recommended Action:
 - Field-test the instrumented build against the affected device and review summary.json evidence.
 
+---
+
+Date: 2026-09-03
+Agent: Claude
+
+Phase: EnvironmentCredentialSubstitution
+
+Changes:
+- Confirmed PHASE-041 closure: Terra approved, 187 tests passing, stable checkpoint achieved.
+- Parked timeout investigation: PHASE-040 completed the available field collection, but DD-007 remains inconclusive until reachable hardware is available.
+- Reviewed Wishlist Phase 8 and confirmed default credentials and device overrides already exist, but credential values still require local plaintext YAML.
+- Created PHASE-042-EnvironmentCredentialSubstitution.md and proposed DD-010 for environment-backed credential references.
+
+Reason:
+- Environment substitution is a small, deterministic extension of the existing credential loader that removes the need to place live credentials in local YAML while advancing the next unmet Wishlist capability.
+
+Risks Introduced:
+- Environment variables require local process-environment hygiene.
+
+Risks Resolved:
+- Defines a secure-by-default source path compatible with PHASE-041 example templates.
+
+Next Recommended Action:
+- Implement PHASE-042-EnvironmentCredentialSubstitution and review proposed DD-010.
+

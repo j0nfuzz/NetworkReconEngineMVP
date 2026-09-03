@@ -320,3 +320,22 @@ Date:
 
 Phase:
 PHASE-039-RecoveredSessionDiagnosticStateRefresh
+
+---
+
+Decision ID: DD-010
+
+Decision:
+Allow exact `${ENV_VAR}` references for credential fields in YAML configuration; resolve them before existing default-to-device credential merging.
+
+Reason:
+Enables secret-free tracked templates while preserving current YAML configuration and deterministic device-level overrides.
+
+Status:
+Proposed
+
+Date:
+2026-09-03
+
+Phase:
+PHASE-042-EnvironmentCredentialSubstitution
