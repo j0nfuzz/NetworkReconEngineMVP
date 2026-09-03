@@ -332,10 +332,13 @@ Reason:
 Enables secret-free tracked templates while preserving current YAML configuration and deterministic device-level overrides.
 
 Status:
-Approved
+Rejected
 
 Approver:
 GPT Reviewer
+
+Rejection Reason:
+Malformed `${...}` credential references are accepted as literal values rather than rejected.
 
 Date:
 2026-09-03
