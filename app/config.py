@@ -12,16 +12,24 @@ _CREDENTIAL_FIELDS = ("username", "password", "enable_password")
 # Match exactly ${ENV_VAR_NAME} for credential substitution.
 _ENV_PLACEHOLDER_RE = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$")
 
+# Detect strings that look like environment-variable references but are not valid.
+_ENV_MALFORMED_RE = re.compile(r"\$\{.*\}")
 
-def _resolve_credential_value(value: Any) -> Any:
+
+def _resolve_credential_value(value: Any, field_name: str = "credential") -> Any:
     """Resolve a credential field value.
 
     If the value is a string matching ${ENV_VAR}, look up the environment
     variable and return it.  Missing variables raise ValueError.  Non-string
-    values and literal strings are returned unchanged.
+    values and literal strings are returned unchanged.  Malformed ${...}
+    references raise ValueError without exposing secret values.
     """
     if not isinstance(value, str):
         return value
+    if not value.startswith("${"):
+        return value
+    if _ENV_MALFORMED_RE.match(value) and not _ENV_PLACEHOLDER_RE.match(value):
+        raise ValueError(f"Malformed environment variable reference for {field_name}")
     match = _ENV_PLACEHOLDER_RE.match(value)
     if not match:
         return value
@@ -45,7 +53,7 @@ def _resolve_credentials(mapping: Dict[str, Any]) -> Dict[str, Any]:
     resolved = dict(mapping)
     for field in _CREDENTIAL_FIELDS:
         if field in resolved:
-            resolved[field] = _resolve_credential_value(resolved[field])
+            resolved[field] = _resolve_credential_value(resolved[field], field_name=field)
     return resolved
 
 

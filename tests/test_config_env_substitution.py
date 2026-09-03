@@ -143,3 +143,76 @@ devices:
         defaults = load_default_credentials(config)
         assert defaults["username"] == "admin"
         assert defaults["password"] == "<PASSWORD-01>"
+
+
+def test_malformed_placeholder_with_hyphen_rejected(tmp_path):
+    config = _write_config(
+        tmp_path,
+        """
+default:
+  username: ${NRE-BAD}
+devices:
+  - name: switch01
+    hostname: 10.0.0.1
+""",
+    )
+    with pytest.raises(ValueError, match="Malformed environment variable reference"):
+        load_devices(config)
+
+
+def test_empty_placeholder_rejected(tmp_path):
+    config = _write_config(
+        tmp_path,
+        """
+default:
+  username: ${}
+devices:
+  - name: switch01
+    hostname: 10.0.0.1
+""",
+    )
+    with pytest.raises(ValueError, match="Malformed environment variable reference"):
+        load_devices(config)
+
+
+def test_malformed_placeholder_with_space_rejected(tmp_path):
+    config = _write_config(
+        tmp_path,
+        """
+default:
+  password: ${NRE BAD}
+devices:
+  - name: switch01
+    hostname: 10.0.0.1
+""",
+    )
+    with pytest.raises(ValueError, match="Malformed environment variable reference"):
+        load_devices(config)
+
+
+def test_malformed_placeholder_in_device_field_rejected(tmp_path):
+    config = _write_config(
+        tmp_path,
+        """
+devices:
+  - name: switch01
+    hostname: 10.0.0.1
+    password: ${BAD-DEVICE-PASS}
+""",
+    )
+    with pytest.raises(ValueError, match="Malformed environment variable reference"):
+        load_devices(config)
+
+
+def test_value_starting_with_dollar_brace_literal_not_rejected(tmp_path):
+    config = _write_config(
+        tmp_path,
+        """
+devices:
+  - name: switch01
+    hostname: 10.0.0.1
+    password: ${literal prefix
+""",
+    )
+    devices = load_devices(config)
+    assert devices[0]["password"] == "${literal prefix"

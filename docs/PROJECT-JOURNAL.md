@@ -2571,4 +2571,32 @@ Risks Resolved:
 Next Recommended Action:
 - Implement PHASE-043-MalformedCredentialPlaceholderValidation.
 
+---
+
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-043-MalformedCredentialPlaceholderValidation
+
+Changes:
+- Added `_ENV_MALFORMED_RE` to app/config.py to detect credential values that use `${...}` syntax but do not match the valid `${ENV_VAR}` pattern.
+- Updated `_resolve_credential_value()` to raise `ValueError` for malformed references before attempting valid env-var resolution; error messages include the field name and do not expose secret values.
+- Updated `_resolve_credentials()` to pass the credential field name into `_resolve_credential_value()`.
+- Added 5 regression tests to tests/test_config_env_substitution.py covering illegal characters, empty placeholders, spaces, per-device malformed references, and literal values starting with `${` but lacking a closing `}`.
+- Created IMPLEMENTED-PHASE-043-MalformedCredentialPlaceholderValidation.md.
+- Re-proposed DD-010 in DESIGN-DECISION-REGISTER.md (status: Proposed, pending GPT reviewer approval).
+
+Reason:
+- PHASE-042 review rejected the phase because malformed `${...}` references were accepted as literal credentials, violating an explicit PHASE-042 acceptance criterion; PHASE-043 provides the narrow remediation required to satisfy that criterion.
+
+Risks Introduced:
+- None (narrow remediation; no changes to resolution order or literal-credential behaviour).
+
+Risks Resolved:
+- Malformed credential placeholders are now rejected with a clear error instead of being used as secret values.
+- PHASE-042's rejected acceptance criterion is now satisfied.
+
+Next Recommended Action:
+- Run GPT review of PHASE-043 and the re-proposed DD-010.
+
 
