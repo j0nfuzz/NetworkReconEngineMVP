@@ -64,6 +64,12 @@ def test_build_troubleshooting_scope_ignores_empty_neighbor_names():
     assert build_troubleshooting_scope(topology, "SW01") == ["SW01", "SW02"]
 
 
+def test_build_troubleshooting_scope_empty_topology_returns_target_only():
+    """PHASE-052: when no topology seed exists, scope is limited to the target device."""
+    topology = {"nodes": {}, "edges": []}
+    assert build_troubleshooting_scope(topology, "SW01") == ["SW01"]
+
+
 def test_cli_target_device_limits_recursive_collection(tmp_path, monkeypatch):
     config = tmp_path / "devices.yml"
     config.write_text(
@@ -200,7 +206,7 @@ def test_cli_target_device_without_topology_uses_target_only(tmp_path, monkeypat
         main()
 
     _, allowed = collected[0]
-    assert allowed == {"SW01"}
+    assert allowed is None
 
 
 def test_cli_target_device_selects_non_first_seed(tmp_path, monkeypatch):
@@ -250,7 +256,7 @@ def test_cli_target_device_selects_non_first_seed(tmp_path, monkeypatch):
     assert len(collected) == 1
     seed_name, allowed = collected[0]
     assert seed_name == "SW02"
-    assert allowed == {"SW02"}
+    assert allowed is None
 
 
 def test_cli_unknown_target_device_exits_before_collection(tmp_path, monkeypatch):

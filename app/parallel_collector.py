@@ -147,12 +147,11 @@ async def run_parallel_scoped_collection_async(
 ) -> Dict[str, Any]:
     """Collect recursively from a seed device using bounded concurrency.
 
-    This path is only used when a target-device scope is active. It preserves the
-    same checkpoint/resume semantics and neighbor filtering as the sequential
-    orchestrator, but collects all queued devices in each wave concurrently.
+    This path is used when a target-device scope or unbounded recursive discovery
+    is active. It preserves the same checkpoint/resume semantics and neighbor
+    filtering as the sequential orchestrator, but collects all queued devices in
+    each wave concurrently. ``allowed_devices=None`` means unbounded discovery.
     """
-    if allowed_devices is None:
-        raise ValueError("Parallel collection requires an explicit allowed_devices scope")
 
     defaults = default_credentials or {}
     resume = resume_state or {}
@@ -163,7 +162,8 @@ async def run_parallel_scoped_collection_async(
     bundles: Dict[str, DeviceBundle] = {}
 
     pending_names = list(resume.get("pending", []))
-    pending_names = [name for name in pending_names if name in allowed_devices]
+    if allowed_devices is not None:
+        pending_names = [name for name in pending_names if name in allowed_devices]
     queued: set[str] = set(pending_names)
     pending_devices = _reconstruct_pending_devices(pending_names, [], defaults)
     queue: deque[Device] = deque(pending_devices)
@@ -234,7 +234,7 @@ async def run_parallel_scoped_collection_async(
                 neighbor_name = record.get("neighbor")
                 if not neighbor_name or neighbor_name in visited or neighbor_name in queued:
                     continue
-                if neighbor_name not in allowed_devices:
+                if allowed_devices is not None and neighbor_name not in allowed_devices:
                     continue
 
                 classification = classifications.get(neighbor_name, "unknown")

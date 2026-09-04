@@ -260,6 +260,7 @@ def test_configured_vendor_device_gets_role_classified(monkeypatch, tmp_path):
         "--output-dir",
         str(tmp_path),
         "--dry-run",
+        "--no-recurse",
     ])
 
     from app.cli import main
@@ -1093,8 +1094,10 @@ def test_cli_auto_detect_adopts_recovered_client_and_closes_both(monkeypatch, tm
     args = argparse.Namespace(
         dry_run=False,
         recursive=False,
+        no_recurse=True,
         checkpoint_file=None,
         target_device=None,
+        scope_depth=1,
         max_concurrent=5,
     )
     cli_module._run_cli_collection(args, [device], "", tmp_path, verbose=False)
@@ -2003,6 +2006,7 @@ def test_non_recursive_cli_writes_analysis_artifacts(monkeypatch, tmp_path):
         "config/devices.yml",
         "--output-dir",
         str(tmp_path),
+        "--no-recurse",
     ])
 
     from app.cli import main
@@ -2206,6 +2210,7 @@ def test_analysis_pipeline_preserves_existing_outputs(monkeypatch, tmp_path):
         "config/devices.yml",
         "--output-dir",
         str(tmp_path),
+        "--no-recurse",
     ])
 
     from app.cli import main
@@ -2637,4 +2642,213 @@ def test_end_to_end_timeout_recovery_serializes_evidence(monkeypatch, tmp_path):
     assert archived_troubleshooting["recovered_commands"] == recovered
     assert "channel_state" in archived_summary["recovered_commands"][0]
     assert "transport_state" in archived_summary["recovered_commands"][0]
+
+
+def test_parse_args_no_recurse_disables_recursion(monkeypatch):
+    """PHASE-052: --no-recurse is parsed and disables default recursive discovery."""
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        "output",
+        "--no-recurse",
+    ])
+    args = parse_args()
+    assert args.no_recurse is True
+
+
+def test_parse_args_recursive_is_backward_compatible_alias(monkeypatch):
+    """PHASE-052: --recursive remains a valid backward-compatible alias."""
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        "output",
+        "--recursive",
+    ])
+    args = parse_args()
+    assert args.recursive is True
+
+
+def test_default_recursion_enabled_uses_first_device(monkeypatch, tmp_path):
+    """PHASE-052: recursive discovery is enabled by default when devices are supplied."""
+    device_dict = {
+        "name": "seed-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    captured = {}
+
+    def fake_run_recursive_collection(seed_device, **kwargs):
+        captured["seed"] = seed_device
+        bundle = DeviceBundle(
+            device_name=seed_device.name,
+            device_vendor=seed_device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+        return {
+            "successful": [seed_device.name],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {seed_device.name: bundle},
+        }
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert captured["seed"].name == "seed-sw"
+
+
+def test_no_recurse_runs_flat_collection(monkeypatch, tmp_path):
+    """PHASE-052: --no-recurse forces flat (non-recursive) collection."""
+    device_dict = {
+        "name": "flat-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    captured = {}
+
+    def fake_execute(device, dry_run=False):
+        captured["device"] = device
+        return DeviceBundle(
+            device_name=device.name,
+            device_vendor=device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+
+    monkeypatch.setattr("app.cli.execute_device_collection", fake_execute)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+    monkeypatch.setattr("app.cli.run_recursive_collection", lambda *args, **kwargs: None)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--no-recurse",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert captured["device"].name == "flat-sw"
+
+
+def test_target_device_becomes_traversal_root_without_topology(monkeypatch, tmp_path):
+    """PHASE-052: --target-device is the traversal root even without a pre-existing topology.json."""
+    device_dicts = [
+        {"name": "SW01", "hostname": "10.0.0.1", "vendor": "cisco", "username": "admin", "password": "<PASSWORD-01>"},
+        {"name": "SW02", "hostname": "10.0.0.2", "vendor": "cisco", "username": "admin", "password": "<PASSWORD-01>"},
+    ]
+    monkeypatch.setattr("app.cli.load_devices", lambda path: device_dicts)
+
+    captured = {}
+
+    def fake_run_parallel_scoped_collection(seed_device, *, allowed_devices=None, **kwargs):
+        captured["seed"] = seed_device
+        captured["allowed_devices"] = allowed_devices
+        return {
+            "successful": [seed_device.name],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {},
+        }
+
+    monkeypatch.setattr("app.parallel_collector.run_parallel_scoped_collection", fake_run_parallel_scoped_collection)
+    monkeypatch.setattr("app.cli.run_recursive_collection", lambda *args, **kwargs: None)
+    monkeypatch.setattr("app.cli.load_default_credentials", lambda _path: {})
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--target-device",
+        "SW02",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert captured["seed"].name == "SW02"
+    assert captured["allowed_devices"] is None
+
+
+def test_target_device_with_topology_uses_scoped_collection(monkeypatch, tmp_path):
+    """PHASE-052: --target-device with an existing topology.json still scopes to neighbours."""
+    device_dicts = [
+        {"name": "SW01", "hostname": "10.0.0.1", "vendor": "cisco", "username": "admin", "password": "<PASSWORD-01>"},
+        {"name": "SW02", "hostname": "10.0.0.2", "vendor": "cisco", "username": "admin", "password": "<PASSWORD-01>"},
+    ]
+    monkeypatch.setattr("app.cli.load_devices", lambda path: device_dicts)
+
+    topology = {
+        "nodes": {
+            "SW01": {"neighbors": ["SW02"]},
+            "SW02": {"neighbors": ["SW01"]},
+        },
+        "edges": [],
+    }
+    (tmp_path / "topology.json").write_text(json.dumps(topology), encoding="utf-8")
+
+    captured = {}
+
+    def fake_run_parallel_scoped_collection(seed_device, *, allowed_devices=None, **kwargs):
+        captured["seed"] = seed_device
+        captured["allowed_devices"] = allowed_devices
+        return {
+            "successful": [],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {},
+        }
+
+    monkeypatch.setattr("app.parallel_collector.run_parallel_scoped_collection", fake_run_parallel_scoped_collection)
+    monkeypatch.setattr("app.cli.run_recursive_collection", lambda *args, **kwargs: None)
+    monkeypatch.setattr("app.cli.load_default_credentials", lambda _path: {})
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--target-device",
+        "SW01",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert captured["seed"].name == "SW01"
+    assert captured["allowed_devices"] == {"SW01", "SW02"}
 

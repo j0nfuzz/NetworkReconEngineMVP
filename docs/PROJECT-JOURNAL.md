@@ -3047,3 +3047,138 @@ Risks Resolved:
 
 Next Recommended Action:
 - Re-run field validation against a reachable ArubaOS-CX device using a PHASE-051-or-later build to confirm 10/10 command acceptance and log-output capture.
+
+---
+
+Date: 2026-09-04
+Agent: Claude
+
+Phase: PHASE-052-AutomaticTraversalRootSelection
+
+Changes:
+- Selected `AutomaticTraversalRootSelection` as the single next phase, combining REVIEW-PHASE-050 candidates C (AutomaticTraversalRootSelection) and D (DefaultRecursiveDiscoveryBehaviour) into one bounded CLI-scope change, per the review's own recommendation that they form one cohesive usability fix.
+- Rationale: with the ArubaOS-CX command-profile defect fully closed (PHASE-047/049/051), the highest remaining gap against the stated project goal ("point at one device, receive a complete troubleshooting package") is that `--target-device` does not become the traversal root without a pre-existing `topology.json`, and recursion is opt-in rather than default.
+- Deferred candidate B (RunningConfigCaptureCompletenessValidation) and candidate E (ArubaOSCXCommandCoverageExpansion) — neither blocks the traversal usability gap and both require separate, independent evidence gathering.
+- Created `docs/Phases/PHASE-052-AutomaticTraversalRootSelection.md`.
+- Proposed DD-014 to formalise the new default CLI traversal/recursion behaviour.
+
+Reason:
+- This is an architectural CLI/traversal-entry change (alters default behaviour), so it requires a DDR proposal, unlike PHASE-051's pure static command fix.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; the phase is scoped to correct the traversal-root/default-recursion gap once implemented.
+
+Next Recommended Action:
+- Implement PHASE-052-AutomaticTraversalRootSelection per its acceptance criteria; obtain GPT Reviewer approval for DD-014 before or alongside implementation.
+
+---
+
+Date: 2026-09-04
+Agent: Kimi
+
+Phase: PHASE-052-AutomaticTraversalRootSelection
+
+Changes:
+- `app/cli.py`: added `--no-recurse` flag, retained `--recursive` as a backward-compatible no-op/alias, and made recursive collection the default whenever devices are supplied and `--no-recurse` is absent.
+- `--target-device` now becomes the traversal root directly, without requiring a pre-existing `topology.json` or the former `--recursive` opt-in.
+- Preserved `--scope-depth`, `--checkpoint-file`, `--max-concurrent`, and cycle-safe BFS behaviour.
+- Updated existing non-recursive CLI tests to pass `--no-recurse` and added PHASE-052 regression tests covering default recursion, `--no-recurse`, `--recursive` compatibility, target-device-as-root with and without topology.
+- Added `tests/test_scope.py::test_build_troubleshooting_scope_empty_topology_returns_target_only`.
+- Full regression suite: 237 passed (`python -m pytest tests -q`).
+- Created `docs/Phases/IMPLEMENTED-PHASE-052-AutomaticTraversalRootSelection.md`.
+
+Reason:
+- Implement DD-014 (Proposed) and align CLI traversal behaviour with the project objective of pointing the tool at one device and receiving a complete troubleshooting package.
+
+Risks Introduced:
+- Default behaviour change: omitting `--recursive` now recurses by default. Existing flat-collection callers must add `--no-recurse` to retain prior behaviour. Mitigated by retaining `--recursive` as a no-op and providing `--no-recurse`.
+
+Risks Resolved:
+- Removes the hidden dependency on a pre-existing `topology.json` to start traversal from `--target-device`.
+- Removes the need for users to discover and supply `--recursive` to obtain a complete package from a single seed device.
+
+Next Recommended Action:
+- GPT Reviewer approval of DD-014; commit PHASE-052 implementation; select next phase.
+
+---
+
+Date: 2026-09-04
+Agent: Claude
+
+Phase: PHASE-053-AutomaticTraversalRootExpansionRemediation
+
+Changes:
+- Reviewed REVIEW-PHASE-052-AutomaticTraversalRootSelection.md (Not Approved) and DD-014 (Rejected): root selection works, but the no-`topology.json` path passes a fixed `{target_device}` `allowed_devices` set to `run_parallel_scoped_collection`, which unconditionally rejects discovered neighbours, so no expansion occurs.
+- Classified this as an implementation defect, not an architectural limitation or phase-boundary issue: `run_recursive_collection` already treats `allowed_devices=None` as unbounded, but `run_parallel_scoped_collection_async` raises `ValueError` on `None` and `app/cli.py` worked around it by hard-coding a single-device set instead of using the existing unbounded-discovery pattern.
+- Selected `AutomaticTraversalRootExpansionRemediation` as the single next phase: relax the parallel collector's `allowed_devices=None` guard to match the sequential orchestrator's existing pattern, and have `app/cli.py` pass `None` (not a fixed single-device set) when no `topology.json` exists for `--target-device`.
+- Created `docs/Phases/PHASE-053-AutomaticTraversalRootExpansionRemediation.md`.
+- Proposed DD-015 to formalise unbounded-discovery support in the parallel scoped collector.
+
+Reason:
+- Restores DD-014's intended one-device-to-complete-package workflow using the smallest correction: reusing an existing, already-proven `None`-handling pattern rather than modifying BFS/cycle-safety, checkpoint/resume, or bounded-concurrency logic.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; the phase is scoped to correct the traversal-expansion defect once implemented.
+
+Next Recommended Action:
+- GPT Reviewer approval of DD-015 and PHASE-053; if approved, commit and select next phase.
+
+---
+
+Date: 2026-09-04
+Agent: Kimi
+
+Phase: PHASE-053-AutomaticTraversalRootExpansionRemediation
+
+Changes:
+- `app/parallel_collector.py`: removed the `ValueError` guard and conditionalised `allowed_devices` checks so `None` means unbounded discovery, matching `run_recursive_collection`.
+- `app/cli.py`: `--target-device` now always routes through `run_parallel_scoped_collection`; passes `allowed_devices=None` when no `topology.json` exists, and the existing hop-limited set when `topology.json` exists.
+- Updated existing no-topology tests in `tests/test_cli.py` and `tests/test_scope.py` to assert `allowed_devices is None`.
+- Added `tests/test_parallel_collector.py` regression tests for unbounded discovery, no-raise on `None`, and preserved set-bounded behaviour.
+- Full regression suite: 240 passed (`python -m pytest tests -q`).
+- Created `docs/Phases/IMPLEMENTED-PHASE-053-AutomaticTraversalRootExpansionRemediation.md`.
+
+Reason:
+- Correct the PHASE-052 implementation defect identified in REVIEW-PHASE-052: a fixed single-device `allowed_devices` set prevented neighbour expansion when no `topology.json` was present, violating DD-014's one-device-to-complete-package objective.
+
+Risks Introduced:
+- `--target-device` without a topology file now expands unbounded by hops (still bounded by `max_devices`); users wanting single-device collection must use `--no-recurse`.
+
+Risks Resolved:
+- Discovered neighbours are now eligible for traversal from a target root without a pre-existing `topology.json`.
+- Parallel collector contract now matches the sequential orchestrator's existing `allowed_devices=None` semantics.
+
+Next Recommended Action:
+- GPT Reviewer approval of DD-015 and PHASE-053; if approved, commit and select next phase.
+
+---
+
+Date: 2026-09-04
+Agent: Claude
+
+Phase: PHASE-054-TraversalExpansionFieldTestBuildPreparation
+
+Changes:
+- Reviewed REVIEW-PHASE-053 (Approved, DD-015 Approved, checkpoint PUSH RECOMMENDED but not yet committed) and weighed the reviewer's recommended next phase (`RunningConfigCaptureCompletenessValidation`) against field-validating the just-changed traversal defaults.
+- Selected `TraversalExpansionFieldTestBuildPreparation` instead of `RunningConfigCaptureCompletenessValidation`: PHASE-052/053 changed a core default (recursion-on-by-default, unbounded no-topology neighbour expansion) that has never run against real hardware; the project's own precedent (PHASE-048's rejection for analysing evidence against a pre-PHASE-047 build, remediated by PHASE-049) establishes that a major behavioural change must be committed and packaged into a field-testable build before further unrelated defect investigation proceeds.
+- Rationale: `RunningConfigCaptureCompletenessValidation` is orthogonal to traversal and does not depend on PHASE-053; deferring it briefly does not block it, whereas deferring build/commit of PHASE-053 risks a repeat of the PHASE-048 provenance-gap failure mode if a future phase field-tests traversal against a stale pre-053 build.
+- Created `docs/Phases/PHASE-054-TraversalExpansionFieldTestBuildPreparation.md`.
+- No DDR changes required: this phase packages already-approved DD-014/DD-015 behaviour; it introduces no new architectural decision.
+
+Reason:
+- Reduces technical uncertainty on the highest-risk, most-recently-changed code path (default traversal behaviour) before compounding it with a second, independent unvalidated area (running-config completeness).
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; the phase is scoped to produce a committed, packaged, field-testable PHASE-053 build.
+
+Next Recommended Action:
+- Implement PHASE-054-TraversalExpansionFieldTestBuildPreparation per its acceptance criteria; schedule field validation of the new traversal defaults against a reachable multi-hop device once built.

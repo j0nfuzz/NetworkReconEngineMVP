@@ -66,9 +66,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="Validate configuration without trying SSH")
     parser.add_argument("--verbose", action="store_true", help="Print detailed SSH and collection diagnostics")
     parser.add_argument("--probe", action="store_true", help="Probe device(s), report reachability/legacy classification, then exit")
-    parser.add_argument("--recursive", action="store_true", help="Collect recursively from the first configured device")
+    parser.add_argument(
+        "--recursive",
+        action="store_true",
+        help="Backward-compatible alias: recursive discovery is now the default; use --no-recurse to disable",
+    )
+    parser.add_argument("--no-recurse", action="store_true", help="Disable recursive discovery from the target device")
     parser.add_argument("--checkpoint-file", default=None, help="Path to JSON checkpoint file for resume/recursive runs")
-    parser.add_argument("--target-device", default=None, help="Limit recursive collection to this device and its topology neighbours")
+    parser.add_argument("--target-device", default=None, help="Use this configured device as the traversal root and limit scope to its topology neighbours")
     parser.add_argument(
         "--scope-depth",
         type=int,
@@ -129,12 +134,12 @@ def _run_recursive_cli(
             scope = build_troubleshooting_scope(
                 topology, target_device, hops=scope_depth
             )
+            allowed_devices = set(scope)
+            log_verbose(f"[verbose] Limiting recursive collection to scope: {scope}")
         else:
-            scope = [target_device]
-        allowed_devices = set(scope)
-        log_verbose(f"[verbose] Limiting recursive collection to scope: {scope}")
+            log_verbose(f"[verbose] Targeting {target_device} as traversal root; scope will expand as neighbours are discovered")
 
-    if allowed_devices is not None:
+    if target_device is not None:
         from app.parallel_collector import run_parallel_scoped_collection
 
         result = run_parallel_scoped_collection(
@@ -238,7 +243,9 @@ def _run_cli_collection(
         if verbose:
             print(message)
 
-    if args.recursive and devices:
+    no_recurse = getattr(args, "no_recurse", False)
+    recurse = bool(devices and not no_recurse)
+    if recurse:
         if args.target_device:
             target_matches = [d for d in devices if d.name == args.target_device]
             if not target_matches:
@@ -259,7 +266,7 @@ def _run_cli_collection(
             scope_depth=args.scope_depth,
             max_concurrent=args.max_concurrent,
         )
-    else:
+    elif devices:
         for device in devices:
             log_verbose(f"[verbose] Starting device: {device.name} ({device.hostname}:{device.port})")
             if device.vendor == "auto":

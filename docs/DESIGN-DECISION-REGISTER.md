@@ -408,3 +408,50 @@ Date:
 
 Phase:
 PHASE-048-ArubaOSCXCommandProfileFieldValidation
+
+---
+
+Decision ID: DD-014
+
+Decision:
+`--target-device` becomes the traversal root directly without requiring a pre-existing `topology.json`; recursive collection defaults to enabled and is disabled explicitly via `--no-recurse`. The existing `--recursive` flag is retained as a backward-compatible no-op/alias.
+
+Reason:
+Field testing showed the current opt-in, topology-file-dependent recursion model does not match the project's stated goal of a single-target-to-complete-package workflow; this is the smallest change that aligns CLI defaults with that goal without altering the traversal algorithm itself.
+
+Status:
+Rejected
+
+Approver:
+GPT Reviewer
+
+Date:
+2026-09-04
+
+Phase:
+PHASE-052-AutomaticTraversalRootSelection
+
+Rejection Reason:
+The implementation constrains the no-topology target root to a fixed one-device allowed scope, so discovered neighbours cannot be traversed and DD-014's complete-package objective is not met.
+
+---
+
+Decision ID: DD-015
+
+Decision:
+`run_parallel_scoped_collection`/`run_parallel_scoped_collection_async` accept `allowed_devices=None` to mean unbounded neighbour discovery from the seed device, mirroring the existing `None`-handling already present in `run_recursive_collection`. `app/cli.py` passes `allowed_devices=None` for `--target-device` when no `topology.json` exists (unbounded, bounded-concurrency discovery from the target root), and continues to pass the computed hop-limited set when `topology.json` exists.
+
+Reason:
+DD-014's implementation (PHASE-052) was rejected because it passed a fixed single-device `allowed_devices` set to the parallel collector, which unconditionally rejects any device outside that set, preventing neighbour discovery. The parallel collector's `ValueError` guard against `allowed_devices=None` was an artificial restriction not present in the sequential orchestrator; relaxing it to match the sequential path's existing pattern is the smallest corrective change that restores the target-root-to-complete-package workflow without altering the traversal/BFS algorithm.
+
+Status:
+Approved
+
+Approver:
+GPT Reviewer
+
+Date:
+2026-09-04
+
+Phase:
+PHASE-053-AutomaticTraversalRootExpansionRemediation

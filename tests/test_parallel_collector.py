@@ -320,3 +320,60 @@ def test_cli_help_text_documents_ceiling():
         )
     help_text = parser.format_help()
     assert "1-10" in help_text
+
+
+def test_allowed_devices_none_discovers_neighbors(monkeypatch):
+    """PHASE-053: allowed_devices=None enables unbounded discovery from the seed."""
+    seed = Device(name="SW01", hostname="10.0.0.1", vendor="cisco")
+    neighbor_map = {
+        "SW01": [
+            {"neighbor": "SW02", "ip": "10.0.0.2", "platform": "cisco WS-C2960-24TC-L"},
+        ],
+        "SW02": [],
+    }
+
+    async def fake_collect(device: Device) -> DeviceBundle:
+        return _make_bundle(device.name, device.vendor, "collected", neighbor_map.get(device.name, []))
+
+    monkeypatch.setattr("app.parallel_collector._collect_device", fake_collect)
+
+    result = run_parallel_scoped_collection(seed, allowed_devices=None, max_concurrent=2)
+
+    assert set(result["bundles"].keys()) == {"SW01", "SW02"}
+    assert result["successful"] == ["SW01", "SW02"]
+
+
+def test_allowed_devices_none_no_longer_raises(monkeypatch):
+    """PHASE-053: allowed_devices=None is accepted instead of raising ValueError."""
+    seed = Device(name="SW01", hostname="10.0.0.1", vendor="cisco")
+
+    async def fake_collect(device: Device) -> DeviceBundle:
+        return _make_bundle(device.name, device.vendor, "collected", [])
+
+    monkeypatch.setattr("app.parallel_collector._collect_device", fake_collect)
+
+    result = run_parallel_scoped_collection(seed, allowed_devices=None, max_concurrent=1)
+
+    assert result["successful"] == ["SW01"]
+
+
+def test_allowed_devices_set_still_bounds_discovery(monkeypatch):
+    """PHASE-053: an explicit allowed set still prevents out-of-scope neighbours."""
+    seed = Device(name="SW01", hostname="10.0.0.1", vendor="cisco")
+    neighbor_map = {
+        "SW01": [
+            {"neighbor": "SW02", "ip": "10.0.0.2", "platform": "cisco WS-C2960-24TC-L"},
+            {"neighbor": "SW03", "ip": "10.0.0.3", "platform": "cisco WS-C2960-24TC-L"},
+        ],
+        "SW02": [],
+    }
+
+    async def fake_collect(device: Device) -> DeviceBundle:
+        return _make_bundle(device.name, device.vendor, "collected", neighbor_map.get(device.name, []))
+
+    monkeypatch.setattr("app.parallel_collector._collect_device", fake_collect)
+
+    result = run_parallel_scoped_collection(seed, allowed_devices={"SW01", "SW02"}, max_concurrent=2)
+
+    assert set(result["bundles"].keys()) == {"SW01", "SW02"}
+    assert "SW03" not in result["bundles"]

@@ -40,5 +40,8 @@ config/*.yml
 # Packaged distribution artefacts
 *.zip
 
+# Local pytest basetemp (see pytest.ini addopts)
+.pytest_tmp/
+
 # LLM context packs / checkpoints
 context_packs/
