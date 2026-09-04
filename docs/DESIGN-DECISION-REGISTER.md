@@ -364,3 +364,47 @@ Date:
 
 Phase:
 PHASE-045-MultiHopTroubleshootingScope
+
+---
+
+Decision ID: DD-012
+
+Decision:
+`get_vendor_commands()` accepts an optional `platform` parameter; when `vendor == "aruba"` and `platform` contains `"cx"` (case-insensitive), an `"aruba-cx"` command profile is selected instead of the existing generic `"aruba"` profile. `app/collector.py` supplies the already-computed `device.metadata["identity"]["platform"]` at the existing call site. Callers omitting `platform`, and all other vendors, are unaffected.
+
+Reason:
+PHASE-046 field evidence showed 5 of 10 generic `"aruba"` profile commands rejected by an ArubaOS-CX device's CLI parser while the other 5 succeeded, proving a command-syntax/profile defect rather than a vendor-detection, transport, or topology defect. Platform-aware profile selection is the minimal additive change that corrects this without touching SSH, retry, recovery, topology, provenance, or credential code.
+
+Status:
+Approved
+
+Approver:
+GPT Reviewer
+
+Date:
+2026-09-04
+
+Phase:
+PHASE-047-ArubaOSCXCommandProfileCorrection
+
+---
+
+Decision ID: DD-013
+
+Decision:
+Static platform-specific command-profile changes require a documented command source, deterministic regression tests, and sanitised field validation before being treated as validated beyond the observed platform/version. Runtime capability detection and command fallback remain deferred unless field evidence shows the static profile is insufficient.
+
+Reason:
+PHASE-047 corrects commands from evidence obtained on one ArubaOS-CX platform/version. This governance preserves a small, auditable profile model while preventing unsupported generalisation or speculative execution-engine changes.
+
+Status:
+Approved
+
+Approver:
+GPT Reviewer
+
+Date:
+2026-09-04
+
+Phase:
+PHASE-048-ArubaOSCXCommandProfileFieldValidation

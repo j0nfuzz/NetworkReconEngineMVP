@@ -121,6 +121,20 @@ VENDOR_PROFILES: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             "show log buffer",
         ]
     },
+    "aruba-cx": {
+        "commands": [
+            "show version",
+            "show module",
+            "show interface brief",
+            "show ip interface brief",
+            "show ip route",
+            "show lldp neighbor-info detail",
+            "show arp",
+            "show system",
+            "show running-config",
+            "show log",
+        ]
+    },
     "generic": {
         "commands": [
             "show version",
@@ -133,8 +147,12 @@ VENDOR_PROFILES: Dict[str, Dict[str, Dict[str, List[str]]]] = {
 }
 
 
-def get_vendor_commands(vendor: str, role: str | None = None) -> List[str]:
+def get_vendor_commands(
+    vendor: str, role: str | None = None, platform: str | None = None
+) -> List[str]:
     key = (vendor or "generic").lower()
+    if key == "aruba" and platform and "cx" in platform.lower():
+        key = "aruba-cx"
     profile = VENDOR_PROFILES.get(key, VENDOR_PROFILES["generic"])
     commands = _resolve_commands(profile, role)
     invalid = [cmd for cmd in commands if not validate_read_only_command(cmd)]

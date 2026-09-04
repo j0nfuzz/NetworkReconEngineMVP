@@ -2761,4 +2761,208 @@ Risks Resolved:
 Next Recommended Action:
 - No remediation phase is warranted; PHASE-045/046 close the currently actionable work for Wishlist Phase 14. Await a reachable multi-hop-capable device before scheduling further field validation, or select the next highest-value phase from the roadmap.
 
+---
 
+Date: 2026-09-03
+Agent: Kimi
+
+Phase: PHASE-046-MultiHopScopeFieldValidation (field-test build preparation)
+
+Changes:
+- Built a fresh embedded-runtime field artifact with `python -m build_portable` from commit `077f5bd7fedf14f83cb16e62e422b61f50309382`.
+- Generated `dist/NetworkReconEngine.zip` (29,486,574 bytes), containing the approved provenance, diagnostics, credential, and multi-hop scope modules.
+- Verified the packaged CLI starts and its help lists `--target-device` and `--scope-depth`.
+- Verified packaged dry-run accepts recursive target scoping with `--scope-depth 3` without network activity or runtime errors.
+
+Reason:
+- PHASE-046 field validation requires a current deployable build containing approved functionality through PHASE-045 before a reachable real topology can be tested.
+
+Risks Introduced:
+- None; no production, topology, credential, SSH, recovery, retry, timeout, or provenance implementation changed.
+
+Risks Resolved:
+- A current deployable field-test artifact is available for real-network PHASE-046 validation.
+
+Next Recommended Action:
+- Deploy `dist/NetworkReconEngine.zip` to an approved environment with a reachable CDP/LLDP-capable topology and execute the recorded PHASE-046 field-validation procedure.
+
+---
+
+Date: 2026-09-04
+Agent: Claude
+
+Phase: PHASE-047-ArubaOSCXCommandProfileCorrection
+
+Changes:
+- Reviewed the sanitised REVIEW-PHASE-046 command-profile assessment: the generic `"aruba"` vendor profile is only partially compatible with the observed ArubaOS-CX platform (5 of 10 commands rejected by the device CLI parser; the other 5 accepted, including `show version` and `show system`, confirming the failures are command-syntax mismatches, not transport/recovery/timeout defects).
+- Determined the sanitised, non-identifying field evidence supports command-profile remediation as the next workstream; topology traversal and DD-011 remain out of scope for this decision (unaffected by the observed failures).
+- Evaluated the four remediation approaches raised for consideration: static command replacement (direct fix for the 5 confirmed-incompatible commands), platform-version conditional logic (select profile by `DeviceIdentity.platform`, not just vendor), runtime capability detection/fallback hierarchy (probe-and-retry at collection time), and evidence-driven validation (require documented sourcing for any replacement command).
+- Selected static command replacement plus platform-aware profile selection as the PHASE-047 scope: `device.metadata["identity"]["platform"]` is already computed and available at the exact call site in `app/collector.py`, so gating an `"aruba-cx"` profile on `platform` containing `"cx"` is a minimal, additive change that does not touch SSH, retry, recovery, topology, provenance, or credential code.
+- Deferred runtime capability detection and command fallback hierarchy to a future, contingent phase: implementing live probe-and-retry at collection time would require collector/execution-loop changes and cannot be justified without a second field test confirming the static correction is insufficient.
+- Created PHASE-047-ArubaOSCXCommandProfileCorrection.md.
+
+Reason:
+- Field evidence provides direct proof of a command-profile defect (not a vendor-detection, transport, or topology defect), and the corrective work is small, additive, and independently testable — satisfying the standing preference for minimal, reviewable changes over speculative runtime infrastructure.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; PHASE-047 is scoped to correct the confirmed ArubaOS-CX command-profile defect once implemented.
+
+Next Recommended Action:
+- Implement PHASE-047-ArubaOSCXCommandProfileCorrection; propose DD-012 for platform-aware vendor command profile selection.
+
+---
+
+Date: 2026-09-04
+Agent: Kimi
+Phase: PHASE-047-ArubaOSCXCommandProfileCorrection
+
+Changes:
+- Added an `aruba-cx` platform-specific command profile in `app/vendor_profiles.py` that retains the 5 commands confirmed successful on the observed ArubaOS-CX device and replaces the 5 rejected commands with their ArubaOS-CX CLI equivalents.
+- Extended `get_vendor_commands()` with an optional `platform` parameter; when `vendor == "aruba"` and the platform string contains `"cx"` (case-insensitive), the corrected `aruba-cx` profile is selected.
+- Updated `app/collector.py` to pass `device.metadata["identity"]["platform"]` into `get_vendor_commands()` at the existing call site, preserving all other collection, SSH, retry, topology, provenance, and credential behaviour.
+- Added `tests/test_vendor_profiles.py` with regression coverage for platform-aware profile selection, read-only validation, deterministic ordering, and backward compatibility.
+- Updated three `app.collector.get_vendor_commands` monkeypatch lambdas in `tests/test_cli.py` to accept the new optional `platform` argument.
+- Updated DD-012 status from Proposed to Approved.
+- Created `IMPLEMENTED-PHASE-047-ArubaOSCXCommandProfileCorrection.md`.
+
+Reason:
+- PHASE-046 field evidence proved the generic `aruba` profile is incompatible with ArubaOS-CX for 5 of 10 commands; platform-aware profile selection is the minimal additive fix and satisfies the approved DD-012 architectural direction.
+
+Risks Introduced:
+- ArubaOS-CX command syntax varies by firmware; the corrected static commands are sourced from official CLI references but cannot be revalidated in this environment until the next field-test opportunity.
+- Platform-aware selection is currently limited to ArubaOS-CX; generalising to other vendors is deferred to a future phase.
+
+Risks Resolved:
+- Eliminates the confirmed command-profile mismatch for ArubaOS-CX without modifying vendor detection, SSH handling, retry/recovery, topology, provenance, or credential code.
+
+Next Recommended Action:
+- Schedule a focused field revalidation against a reachable ArubaOS-CX device to confirm the corrected profile commands are accepted, and consider generalising platform-aware profiles to other vendors once the pattern is proven.
+
+---
+
+Date: 2026-09-04
+Agent: GitHub Copilot
+Phase: PHASE-048-ArubaOSCXCommandProfileFieldValidation
+
+Changes:
+- Completed the PHASE-047 architectural review and selected a focused ArubaOS-CX field-validation phase.
+- Created PHASE-048-ArubaOSCXCommandProfileFieldValidation.md with acceptance criteria, a sanitised evidence procedure, decision gates, and explicit no-code-change constraints.
+- Proposed DD-013 to require documented sourcing, deterministic regression coverage, and sanitised field validation for static platform-specific command-profile changes.
+- Explicitly deferred runtime capability detection and command fallback; PHASE-047's profile was based on one observed platform/version and no evidence supports execution-engine expansion.
+
+Reason:
+- PHASE-047 addresses the known parser rejections, but one observed platform/version cannot validate the corrected profile across firmware releases. Field evidence is the proportionate next step; governance keeps future static profile changes traceable and bounded.
+
+Risks Introduced:
+- None in production code; PHASE-048 handles sensitive read-only configuration output only within `field_tests/`.
+
+Risks Resolved:
+- Establishes a defined validation gate and evidence standard for the new ArubaOS-CX static profile.
+
+Next Recommended Action:
+- Obtain approved access to a reachable ArubaOS-CX device and execute PHASE-048. Submit DD-013 for GPT Reviewer approval before treating the governance rule as authoritative.
+
+---
+
+Date: 2026-09-04
+Agent: Claude
+Phase: PHASE-048-ArubaOSCXCommandProfileFieldValidation
+
+Changes:
+- Read `field_tests/FIELDTEST.MD` before analysing any evidence, per governance requirements.
+- Inspected `field_tests/output.zip` and determined it predates the PHASE-047 implementation date; it reflects the superseded generic `aruba` profile, not the corrected `aruba-cx` profile, so it cannot serve as PHASE-048 validation evidence.
+- Re-confirmed the PHASE-046 baseline is unchanged (ArubaOS-CX detected, 5 of 10 pre-fix commands accepted/rejected, provenance present, no transport error type on failures) but produced no new PHASE-048 dataset to compare against it.
+- Created `docs/FieldEvidence/PHASE-048-20260904-arubaos-cx-profile-findings.md` documenting the field-access limitation and re-confirmed baseline.
+- Created `docs/Phases/REVIEW-PHASE-048-ArubaOSCXCommandProfileFieldValidation.md` recording an INCONCLUSIVE/BLOCKED review outcome.
+- Created `docs/Phases/IMPLEMENTED-PHASE-048-ArubaOSCXCommandProfileFieldValidation.md` documenting the blocked status against each of the phase's 8 validation goals.
+- Made no changes to collector, SSH, credential, topology, provenance, or execution-engine code, per phase constraints.
+- Re-ran the full regression suite to confirm no unrelated regressions: `python -m pytest tests -q` — 229 passed.
+
+Reason:
+- The only available field evidence bundle was generated before PHASE-047 existed, so it cannot validate the corrected commands. Per standing project practice (see PHASE-040, PHASE-046), a genuine field-access limitation is documented honestly rather than fabricating a field run or claiming validation that did not occur.
+
+Risks Introduced:
+- None (no source code changed).
+
+Risks Resolved:
+- None. The field-verification gap for the corrected ArubaOS-CX profile remains open, carried forward from PHASE-047.
+
+Next Recommended Action:
+- Schedule a live collection against a reachable ArubaOS-CX device using a build containing the PHASE-047 corrected profile; only that evidence can close PHASE-048 and support elevating DD-013 to Approved. ArubaOS-CX remediation should not be considered field-validated until then.
+
+---
+
+Date: 2026-09-04
+Agent: Kimi
+Phase: PHASE-048-ArubaOSCXCommandProfileFieldValidation
+
+Changes:
+- Verified `field_tests/FIELDTEST.MD` was read and followed before any evidence inspection.
+- Confirmed `field_tests/output.zip` predates PHASE-047 and cannot validate the corrected `aruba-cx` profile.
+- Finalised PHASE-048 implementation artefacts in prompt-compliant format:
+  - `docs/FieldEvidence/PHASE-048-20260904-arubaos-cx-profile-findings.md`
+  - `docs/Phases/REVIEW-PHASE-048-ArubaOSCXCommandProfileFieldValidation.md`
+  - `docs/Phases/IMPLEMENTED-PHASE-048-ArubaOSCXCommandProfileFieldValidation.md`
+- No source files modified; regression suite remains at 229 passed.
+
+Reason:
+- PHASE-048 is a field-validation phase. Available evidence is insufficient, so the phase is documented as blocked/inconclusive per FIELDTEST.md and project practice.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- None. The field-validation gap remains open.
+
+Next Recommended Action:
+- Obtain a reachable ArubaOS-CX device and run a live collection with a PHASE-047-era build to generate the evidence needed to close PHASE-048.
+
+---
+
+Date: 2026-09-04
+Agent: GPT Reviewer
+Phase: PHASE-048-ArubaOSCXCommandProfileFieldValidation
+
+Changes:
+- Reviewed PHASE-048 as Not Approved: the available evidence predates PHASE-047 and cannot validate the corrected profile.
+- Approved DD-013.
+- Recorded a process note: a field-validation phase must establish a post-change field dataset before analysis; lacking one is a blocked outcome, not field validation.
+
+Reason:
+- Prevents stale evidence from being treated as validation of a later change.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- DD-013 now governs evidence expectations for platform-specific command profiles.
+
+Next Recommended Action:
+- Re-execute PHASE-048 with a reachable ArubaOS-CX device and a PHASE-047-or-later build.
+
+---
+
+Date: 2026-09-04
+Agent: Claude
+Phase: PHASE-049-ArubaOSCXFieldTestBuildPreparation
+
+Changes:
+- Root-caused the PHASE-048 Not Approved outcome: `git log`/`git status` confirm HEAD remains at the PHASE-046 commit and PHASE-047's code changes (`app/vendor_profiles.py`, `app/collector.py`) were only uncommitted working-tree edits. `dist/NetworkReconEngine.zip` was built before PHASE-047 existed. No build containing PHASE-047 has ever existed, so PHASE-048 could not have succeeded regardless of field access.
+- Marked PHASE-048's phase, implemented, review, and field-evidence files as SUPERSEDED / NON-AUTHORITATIVE (retained unmodified for evidence/history; not deleted).
+- Confirmed project state reverts to the last valid checkpoint: PHASE-047 implemented and approved, DD-012 Approved. DD-013 (approved during PHASE-048 review) remains Approved and unaffected — its governance rule is independently valid regardless of the sequencing defect.
+- Created `docs/Phases/PHASE-049-ArubaOSCXFieldTestBuildPreparation.md`: a build/packaging-only phase (commit PHASE-047's changes, rebuild `dist/`, verify packaging) with no evidence analysis, as the correct prerequisite before any future field-validation attempt.
+
+Reason:
+- A field-validation phase cannot succeed against a build that was never produced. The corrective action is a narrow, mechanical build-preparation phase, not a redesign or a repeat of the same invalid field-validation attempt.
+
+Risks Introduced:
+- None (no source code changes; commit contains only already-approved PHASE-047 work).
+
+Risks Resolved:
+- Removes the invalid phase sequencing that caused PHASE-048 to fail regardless of field-access; establishes a verifiable build/commit prerequisite for future field validation.
+
+Next Recommended Action:
+- Implement PHASE-049-ArubaOSCXFieldTestBuildPreparation, then schedule a new field-validation phase once a reachable ArubaOS-CX device and the resulting PHASE-047-containing build are both available.

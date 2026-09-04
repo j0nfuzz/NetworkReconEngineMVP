@@ -35,3 +35,11 @@ RISKS RESOLVED:
 OPEN ISSUES:
 - Real multi-hop BFS traversal (hops > 0 over actual discovered edges) remains unverified against field data; requires a reachable device with at least one real CDP/LLDP neighbour to close.
 - DD-007 remains inconclusively validated on real hardware (unrelated, carried risk).
+
+FIELD-TEST BUILD PREPARATION:
+- Fresh embedded-runtime distribution built from commit `077f5bd7fedf14f83cb16e62e422b61f50309382` using `python -m build_portable`.
+- Produced `dist/NetworkReconEngine.zip` (29,486,574 bytes).
+- The bundle contains approved modules through PHASE-045, including `app/provenance.py`, `app/ssh_client.py`, `app/collector.py`, `app/config.py`, and `app/scope.py`.
+- Packaged `run_portable.py --help` launches successfully and lists `--target-device` and `--scope-depth`.
+- Packaged dry-run accepts `--recursive --target-device sample-cisco-router --scope-depth 3` without network activity or runtime errors.
+- The artifact is ready to deploy for PHASE-046 real-network validation; the remaining blocker is access to a reachable CDP/LLDP-capable topology, not build readiness.

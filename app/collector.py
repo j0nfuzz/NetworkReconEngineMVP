@@ -49,7 +49,8 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
     failed_command_details: List[Dict[str, object]] = []
     recovered_commands: List[Dict[str, object]] = []
     role = (device.metadata.get("role") or {}).get("role")
-    commands = get_vendor_commands(device.vendor, role=role)
+    platform = identity.get("platform") if identity else None
+    commands = get_vendor_commands(device.vendor, role=role, platform=platform)
     invalid_commands = validate_device_command_set(commands)
     if invalid_commands:
         raise ValueError(f"Read-only policy violation for {device.name}: {invalid_commands}")

@@ -1107,7 +1107,7 @@ def test_cli_auto_detect_adopts_recovered_client_and_closes_both(monkeypatch, tm
 
 def test_execute_device_collection_records_failed_command_evidence(monkeypatch):
     commands = ["show version"]
-    monkeypatch.setattr("app.collector.get_vendor_commands", lambda vendor, role=None: commands)
+    monkeypatch.setattr("app.collector.get_vendor_commands", lambda vendor, role=None, platform=None: commands)
 
     class FakeSSHClient:
         def __init__(self, **kwargs):
@@ -2419,7 +2419,7 @@ def test_failed_command_partial_output_survives_in_bundle_artifacts(tmp_path):
 def test_recovered_command_evidence_includes_failed_retry_attempts(monkeypatch, tmp_path):
     """PHASE-033: a timeout followed by a failed retry is recorded in failed_command_details with original evidence."""
     commands = ["show version"]
-    monkeypatch.setattr("app.collector.get_vendor_commands", lambda vendor, role=None: commands)
+    monkeypatch.setattr("app.collector.get_vendor_commands", lambda vendor, role=None, platform=None: commands)
 
     class FakeSSHClient:
         def __init__(self, **kwargs):
@@ -2592,7 +2592,7 @@ def test_end_to_end_timeout_recovery_serializes_evidence(monkeypatch, tmp_path):
 
     monkeypatch.setattr(DeviceSSHClient, "connect", fake_connect)
     monkeypatch.setattr(DeviceSSHClient, "probe", lambda self: {"reachable": True, "status": "connected"})
-    monkeypatch.setattr("app.collector.get_vendor_commands", lambda vendor, role=None: ["show version"])
+    monkeypatch.setattr("app.collector.get_vendor_commands", lambda vendor, role=None, platform=None: ["show version"])
 
     device = Device(
         name="e2e-switch",
