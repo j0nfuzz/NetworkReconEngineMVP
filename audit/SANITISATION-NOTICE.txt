@@ -1,1 +1,0 @@
-Historical nested audit checkout reference replaced during publication sanitisation. The parent repository recorded a gitlink, not the checkout files; its complete external history is unavailable. Consult the preserved phase/review records.

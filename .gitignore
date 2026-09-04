@@ -45,3 +45,6 @@ config/*.yml
 
 # LLM context packs / checkpoints
 context_packs/
+
+# Nested audit clone (was accidentally tracked as a gitlink without .gitmodules)
+audit/
