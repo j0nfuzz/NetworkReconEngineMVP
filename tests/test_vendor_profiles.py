@@ -32,7 +32,7 @@ ARUBA_CX_PROFILE_COMMANDS = [
     "show arp",
     "show system",
     "show running-config",
-    "show log",
+    "show logging",
 ]
 
 
@@ -65,7 +65,7 @@ def test_aruba_cx_profile_replaces_rejected_commands() -> None:
     assert "show interface brief" in commands
     assert "show lldp neighbor-info detail" in commands
     assert "show running-config" in commands
-    assert "show log" in commands
+    assert "show logging" in commands
 
 
 def test_aruba_cx_profile_retains_accepted_commands() -> None:
@@ -86,6 +86,12 @@ def test_aruba_cx_commands_are_read_only() -> None:
     assert invalid == []
     for command in commands:
         assert validate_read_only_command(command) is True
+
+
+def test_aruba_cx_profile_replaces_ambiguous_log_command() -> None:
+    commands = get_vendor_commands("aruba", platform="arubaos-cx")
+    assert "show log" not in commands
+    assert "show logging" in commands
 
 
 def test_aruba_cx_profile_order_is_deterministic() -> None:

@@ -132,7 +132,7 @@ VENDOR_PROFILES: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             "show arp",
             "show system",
             "show running-config",
-            "show log",
+            "show logging",
         ]
     },
     "generic": {

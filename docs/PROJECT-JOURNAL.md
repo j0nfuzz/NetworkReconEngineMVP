@@ -2995,3 +2995,55 @@ Risks Resolved:
 
 Next Recommended Action:
 - Deploy `dist/NetworkReconEngine.zip` (commit `7e659ad6a75d2a17589d9fb40acd811bedfd1c7e` or later) to an approved environment with a reachable ArubaOS-CX device and execute the field-validation procedure for the corrected profile.
+
+---
+
+Date: 2026-09-04
+Agent: Claude
+
+Phase: PHASE-051-ArubaOSCXLogCommandRemediation
+
+Changes:
+- Reviewed sanitised PHASE-050 field-validation findings (REVIEW-PHASE-050-ArubaOSCXCommandProfileFieldValidation.md): 9 of 10 `"aruba-cx"` commands returned valid output against a real ArubaOS-CX target, including successful platform detection, LLDP neighbour discovery, and SSH collection. Only `show log` failed (`% Ambiguous command`).
+- Assessed proportionality of the reviewer's Not Approved verdict: correct as applied to the PHASE-050 field-validation phase itself, since one profile command remains unusable on the tested platform. This does not reopen PHASE-047, which remains Approved — the corrected static profile achieved its evidenced objective for 9 of 10 commands, and the bounded, single-command defect is properly scoped as a small follow-on remediation rather than a reason to revert or redesign PHASE-047.
+- Selected `ArubaOSCXLogCommandRemediation` as the single highest-value next phase (reviewer candidate A) over candidates B–E: it is the smallest, most testable, immediately actionable defect with a documented root cause, and closing it is a precondition for any future PHASE-050 re-validation claiming full command-profile success.
+- Deferred candidates B (RunningConfigCaptureCompletenessValidation), C/D (AutomaticTraversalRootSelection / DefaultRecursiveDiscoveryBehaviour — a CLI/traversal architecture change requiring its own DDR proposal), and E (ArubaOSCXCommandCoverageExpansion, no evidence yet supports broader gaps) as candidate future phases, not selected now, per the instruction to select exactly one phase.
+- Created `docs/Phases/PHASE-051-ArubaOSCXLogCommandRemediation.md`.
+
+Reason:
+- A single bounded, evidenced command defect on an already-substantially-corrected profile warrants a small, additive remediation phase, not architectural reconsideration of PHASE-047 or DD-012/DD-013.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; PHASE-051 is scoped to correct the confirmed `show log` defect once implemented.
+
+Next Recommended Action:
+- Implement PHASE-051-ArubaOSCXLogCommandRemediation, sourcing the correct ArubaOS-CX log command from official documentation. Candidates B, C/D, and E remain open for future phase selection once evidence and architectural bandwidth allow.
+
+---
+
+Date: 2026-09-04
+Agent: Kimi
+
+Phase: PHASE-051-ArubaOSCXLogCommandRemediation
+
+Changes:
+- Replaced the ambiguous `"show log"` entry in the `"aruba-cx"` profile with `"show logging"` (documented, read-only ArubaOS-CX CLI logging display command).
+- Updated `tests/test_vendor_profiles.py` fixture and existing assertions to reflect the corrected command.
+- Added `test_aruba_cx_profile_replaces_ambiguous_log_command` to explicitly assert that `"show log"` is absent and `"show logging"` is present.
+- Full regression suite: 230 passed (`python -m pytest tests -q`).
+- Created `docs/Phases/IMPLEMENTED-PHASE-051-ArubaOSCXLogCommandRemediation.md`.
+
+Reason:
+- PHASE-050 sanitised field evidence showed the `"aruba-cx"` profile achieved 9/10 command acceptance, with only `"show log"` failing as ambiguous. Sourcing and substituting the unambiguous documented equivalent closes the final confirmed command-profile defect without touching SSH, topology, traversal, credential, or provenance code.
+
+Risks Introduced:
+- Firmware-specific command syntax may still cause `show logging` to differ on other ArubaOS-CX releases; revalidation on a real device is still required.
+
+Risks Resolved:
+- Removes the known ambiguous command from the ArubaOS-CX profile, leaving no evidenced command-profile rejections.
+
+Next Recommended Action:
+- Re-run field validation against a reachable ArubaOS-CX device using a PHASE-051-or-later build to confirm 10/10 command acceptance and log-output capture.
