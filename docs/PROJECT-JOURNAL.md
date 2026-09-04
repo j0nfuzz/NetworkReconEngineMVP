@@ -2966,3 +2966,32 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-049-ArubaOSCXFieldTestBuildPreparation, then schedule a new field-validation phase once a reachable ArubaOS-CX device and the resulting PHASE-047-containing build are both available.
+
+---
+
+Date: 2026-09-04
+Agent: Kimi
+
+Phase: PHASE-049-ArubaOSCXFieldTestBuildPreparation
+
+Changes:
+- Verified full regression suite passed before packaging (`python -m pytest tests -q` — 229 passed).
+- Committed the previously uncommitted PHASE-047 working-tree changes and related documentation/review artefacts with commit `7e659ad6a75d2a17589d9fb40acd811bedfd1c7e` and message `PHASE-047: ArubaOS-CX command profile correction`.
+- Rebuilt the embedded-runtime distribution with the existing `build_portable.py`: `dist/NetworkReconEngine.zip` (29,486,446 bytes, SHA-256 `42B0BB970C72705DFCB6498B90AF8FE9366560C7B438ACEA954DEF493C973C67`).
+- Verified the packaged bundle contains the corrected `aruba-cx` profile and the corrected command set (`show module`, `show interface brief`, `show lldp neighbor-info detail`, `show running-config`, `show log`).
+- Verified `run_portable.py --help` launches successfully from the built package.
+- Verified a dry-run collection against the bundled config completes without runtime errors from the built package.
+- Re-ran the full regression suite after packaging: 229 passed.
+- Created `docs/Phases/IMPLEMENTED-PHASE-049-ArubaOSCXFieldTestBuildPreparation.md`.
+
+Reason:
+- A deployable build containing the approved PHASE-047 corrected ArubaOS-CX profile is the mechanical prerequisite for any future field-validation phase. Without committing PHASE-047 and producing a fresh distribution, field validation would again analyse stale or non-existent evidence.
+
+Risks Introduced:
+- None; no production code, SSH, retry, topology, credential, provenance, or collection behaviour changed. This phase only packages and formalises already-approved work.
+
+Risks Resolved:
+- Eliminates the risk of attempting field validation against a pre-PHASE-047 build by providing a concrete commit SHA (`7e659ad6a75d2a17589d9fb40acd811bedfd1c7e`) and a verifiable distribution artefact.
+
+Next Recommended Action:
+- Deploy `dist/NetworkReconEngine.zip` (commit `7e659ad6a75d2a17589d9fb40acd811bedfd1c7e` or later) to an approved environment with a reachable ArubaOS-CX device and execute the field-validation procedure for the corrected profile.
