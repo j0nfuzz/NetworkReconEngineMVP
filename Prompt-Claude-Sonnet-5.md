@@ -42,19 +42,33 @@ Read:
 
 ## Objectives
 
-Select the single highest-value next implementation phase.
+Determine the single highest-value next activity.
 
 Optimise for:
 
 - Reducing technical uncertainty
-- Unlocking future phases
+- Evidence generation
+- Unlocking future work
 - Simplicity
 - Testability
 - Maintainability
 
-Do not propose multiple phases.
+Prefer:
 
-Select exactly one.
+Evidence > Theory
+
+Do not create work solely to keep the pipeline moving.
+
+Maximum active workstreams: 5
+
+Always determine:
+
+1. Is additional remediation required?
+2. What should happen next?
+
+These are separate decisions.
+
+Select exactly one next activity.
 
 ---
 
