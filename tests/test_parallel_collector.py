@@ -11,7 +11,9 @@ from app.models import Device, DeviceBundle
 from app.parallel_collector import MAX_CONCURRENT_CEILING, run_parallel_scoped_collection
 
 
-def _make_bundle(name: str, vendor: str, status: str, neighbors: List[Dict[str, str]]) -> DeviceBundle:
+def _make_bundle(
+    name: str, vendor: str, status: str, neighbors: List[Dict[str, str]]
+) -> DeviceBundle:
     return DeviceBundle(
         device_name=name,
         device_vendor=vendor,
@@ -43,7 +45,9 @@ def test_scoped_runs_execute_concurrently(monkeypatch):
         max_active = max(max_active, active)
         await asyncio.sleep(0.1)
         active -= 1
-        return _make_bundle(device.name, device.vendor, "collected", neighbor_map.get(device.name, []))
+        return _make_bundle(
+            device.name, device.vendor, "collected", neighbor_map.get(device.name, [])
+        )
 
     monkeypatch.setattr("app.parallel_collector._collect_device", fake_collect)
 
@@ -75,9 +79,13 @@ def test_unscoped_runs_remain_sequential(monkeypatch, tmp_path):
         sequential_calls.append((args, kwargs))
         return {"successful": [], "failed": [], "unsupported": [], "bundles": {}}
 
-    monkeypatch.setattr("app.parallel_collector.run_parallel_scoped_collection", fake_parallel)
+    monkeypatch.setattr(
+        "app.parallel_collector.run_parallel_scoped_collection", fake_parallel
+    )
     monkeypatch.setattr("app.cli.run_recursive_collection", fake_sequential)
-    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: tmp_path / bundle.device_name)
+    monkeypatch.setattr(
+        "app.cli.write_bundle", lambda bundle, output_dir: tmp_path / bundle.device_name
+    )
     monkeypatch.setattr("app.cli.load_default_credentials", lambda config_path: {})
 
     bundle_summary: Dict[str, Any] = {"devices": []}
@@ -113,7 +121,9 @@ def test_deterministic_manifest_ordering(monkeypatch):
 
     async def fake_collect(device: Device) -> DeviceBundle:
         await asyncio.sleep(delays.get(device.name, 0.0))
-        return _make_bundle(device.name, device.vendor, "collected", neighbor_map.get(device.name, []))
+        return _make_bundle(
+            device.name, device.vendor, "collected", neighbor_map.get(device.name, [])
+        )
 
     monkeypatch.setattr("app.parallel_collector._collect_device", fake_collect)
 
@@ -180,7 +190,9 @@ def test_max_concurrent_limits_simultaneous_sessions(monkeypatch):
         max_active = max(max_active, active)
         await asyncio.sleep(0.05)
         active -= 1
-        return _make_bundle(device.name, device.vendor, "collected", neighbor_map.get(device.name, []))
+        return _make_bundle(
+            device.name, device.vendor, "collected", neighbor_map.get(device.name, [])
+        )
 
     monkeypatch.setattr("app.parallel_collector._collect_device", fake_collect)
 
@@ -235,7 +247,9 @@ def test_wave_respects_max_devices_capacity(monkeypatch):
     }
 
     async def fake_collect(device: Device) -> DeviceBundle:
-        return _make_bundle(device.name, device.vendor, "collected", neighbor_map.get(device.name, []))
+        return _make_bundle(
+            device.name, device.vendor, "collected", neighbor_map.get(device.name, [])
+        )
 
     monkeypatch.setattr("app.parallel_collector._collect_device", fake_collect)
 
@@ -333,7 +347,9 @@ def test_allowed_devices_none_discovers_neighbors(monkeypatch):
     }
 
     async def fake_collect(device: Device) -> DeviceBundle:
-        return _make_bundle(device.name, device.vendor, "collected", neighbor_map.get(device.name, []))
+        return _make_bundle(
+            device.name, device.vendor, "collected", neighbor_map.get(device.name, [])
+        )
 
     monkeypatch.setattr("app.parallel_collector._collect_device", fake_collect)
 
@@ -369,7 +385,9 @@ def test_allowed_devices_set_still_bounds_discovery(monkeypatch):
     }
 
     async def fake_collect(device: Device) -> DeviceBundle:
-        return _make_bundle(device.name, device.vendor, "collected", neighbor_map.get(device.name, []))
+        return _make_bundle(
+            device.name, device.vendor, "collected", neighbor_map.get(device.name, [])
+        )
 
     monkeypatch.setattr("app.parallel_collector._collect_device", fake_collect)
 
@@ -377,3 +395,346 @@ def test_allowed_devices_set_still_bounds_discovery(monkeypatch):
 
     assert set(result["bundles"].keys()) == {"SW01", "SW02"}
     assert "SW03" not in result["bundles"]
+
+
+class FakeAsyncSSHConnection:
+    """Minimal asyncssh stand-in for PHASE-055/055A identity-probe tests."""
+
+    def __init__(self, stdout_map: dict[str, tuple[int, str, str]]):
+        self._stdout_map = stdout_map
+
+    async def run(self, command: str, timeout: int | None = None) -> Any:
+        class Result:
+            pass
+
+        exit_status, stdout, stderr = self._stdout_map.get(command, (1, "", ""))
+        result = Result()
+        result.exit_status = exit_status
+        result.stdout = stdout
+        result.stderr = stderr
+        return result
+
+
+class FakeAsyncSSHConnect:
+    """Context-manager factory mimicking asyncssh.connect()."""
+
+    def __init__(self, connection: FakeAsyncSSHConnection):
+        self._connection = connection
+
+    async def __aenter__(self) -> FakeAsyncSSHConnection:
+        return self._connection
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        return None
+
+
+def test_parallel_collect_device_performs_identity_probe(monkeypatch):
+    """PHASE-055: the parallel path runs an identity probe before command selection."""
+    from app.parallel_collector import _collect_device
+
+    captured_commands: List[str] = []
+
+    class FakeConn:
+        async def run(self, command: str, timeout: int | None = None) -> Any:
+            class Result:
+                pass
+
+            captured_commands.append(command)
+            result = Result()
+            if command == "show version":
+                result.exit_status = 0
+                result.stdout = "Cisco IOS Software, IOS-XE Software"
+                result.stderr = ""
+            else:
+                result.exit_status = 0
+                result.stdout = f"output for {command}"
+                result.stderr = ""
+            return result
+
+    device = Device(
+        name="SW01",
+        hostname="10.0.0.1",
+        vendor="auto",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    async def run_test():
+        monkeypatch.setattr(
+            "app.parallel_collector.asyncssh.connect",
+            lambda *args, **kwargs: FakeAsyncSSHConnect(FakeConn()),
+        )
+        return await _collect_device(device)
+
+    bundle = asyncio.run(run_test())
+
+    assert "show version" in captured_commands
+    assert bundle.summary["vendor"] == "cisco"
+    assert bundle.summary["platform"] == "cisco ios"
+    assert bundle.device_vendor == "cisco"
+
+
+def test_parallel_collect_device_selects_aruba_cx_profile(monkeypatch):
+    """PHASE-055: an ArubaOS-CX device reached via the parallel path selects the aruba-cx profile."""
+    from app.parallel_collector import _collect_device
+
+    captured_commands: List[str] = []
+
+    class FakeConn:
+        async def run(self, command: str, timeout: int | None = None) -> Any:
+            class Result:
+                pass
+
+            captured_commands.append(command)
+            result = Result()
+            if command == "show version":
+                result.exit_status = 0
+                result.stdout = "ArubaOS-CX\nModel: 6300M"
+                result.stderr = ""
+            else:
+                result.exit_status = 0
+                result.stdout = f"output for {command}"
+                result.stderr = ""
+            return result
+
+    device = Device(
+        name="CX01",
+        hostname="10.0.0.1",
+        vendor="auto",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    async def run_test():
+        monkeypatch.setattr(
+            "app.parallel_collector.asyncssh.connect",
+            lambda *args, **kwargs: FakeAsyncSSHConnect(FakeConn()),
+        )
+        return await _collect_device(device)
+
+    bundle = asyncio.run(run_test())
+
+    assert bundle.summary["vendor"] == "aruba"
+    assert bundle.summary["platform"] == "arubaos-cx"
+    assert "show interface brief" in captured_commands
+    assert "show lldp neighbor-info detail" in captured_commands
+
+
+def test_parallel_collect_device_probe_failure_is_recorded(monkeypatch):
+    """PHASE-055: a failed identity probe produces an error bundle without generic fallback."""
+    from app.parallel_collector import _collect_device
+
+    class FakeConn:
+        async def run(self, command: str, timeout: int | None = None) -> Any:
+            class Result:
+                pass
+
+            result = Result()
+            result.exit_status = 1
+            result.stdout = ""
+            result.stderr = "Authentication failed"
+            return result
+
+    device = Device(
+        name="UNREACHABLE",
+        hostname="10.0.0.1",
+        vendor="auto",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    async def run_test():
+        monkeypatch.setattr(
+            "app.parallel_collector.asyncssh.connect",
+            lambda *args, **kwargs: FakeAsyncSSHConnect(FakeConn()),
+        )
+        return await _collect_device(device)
+
+    bundle = asyncio.run(run_test())
+
+    assert bundle.summary["status"] == "error"
+    assert "Identity probe failed" in bundle.summary["error"]
+    assert bundle.summary["commands_run"] == 0
+
+
+def test_parallel_collect_device_preserves_pre_populated_identity(monkeypatch):
+    """PHASE-055A: a higher-confidence pre-populated identity is preserved when the probe is ambiguous."""
+    from app.parallel_collector import _collect_device
+
+    class FakeConn:
+        async def run(self, command: str, timeout: int | None = None) -> Any:
+            class Result:
+                pass
+
+            result = Result()
+            result.exit_status = 0
+            result.stdout = "ArubaOS-CX"
+            result.stderr = ""
+            return result
+
+    device = Device(
+        name="CX02",
+        hostname="10.0.0.1",
+        vendor="cisco",
+        username="admin",
+        password="<PASSWORD-01>",
+        metadata={
+            "identity": {
+                "vendor": "cisco",
+                "platform": "ios",
+                "model": "old",
+                "confidence": 1.0,
+            }
+        },
+    )
+
+    async def run_test():
+        monkeypatch.setattr(
+            "app.parallel_collector.asyncssh.connect",
+            lambda *args, **kwargs: FakeAsyncSSHConnect(FakeConn()),
+        )
+        return await _collect_device(device)
+
+    bundle = asyncio.run(run_test())
+
+    assert bundle.summary["vendor"] == "cisco"
+    assert bundle.summary["platform"] == "ios"
+    assert bundle.device_vendor == "cisco"
+
+
+def test_parallel_collect_device_commands_run_includes_reused_show_version(monkeypatch):
+    """PHASE-055B: commands_run equals the number of executed profile commands when show version is reused."""
+    from app.parallel_collector import _collect_device
+
+    captured_commands: List[str] = []
+
+    class FakeConn:
+        async def run(self, command: str, timeout: int | None = None) -> Any:
+            class Result:
+                pass
+
+            captured_commands.append(command)
+            result = Result()
+            if command == "show version":
+                result.exit_status = 0
+                result.stdout = "ArubaOS-CX\nModel: 6300M"
+                result.stderr = ""
+            else:
+                result.exit_status = 0
+                result.stdout = f"output for {command}"
+                result.stderr = ""
+            return result
+
+    device = Device(
+        name="CX01",
+        hostname="10.0.0.1",
+        vendor="auto",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    async def run_test():
+        monkeypatch.setattr(
+            "app.parallel_collector.asyncssh.connect",
+            lambda *args, **kwargs: FakeAsyncSSHConnect(FakeConn()),
+        )
+        return await _collect_device(device)
+
+    bundle = asyncio.run(run_test())
+
+    assert captured_commands.count("show version") == 1
+    assert bundle.summary["vendor"] == "aruba"
+    assert bundle.summary["platform"] == "arubaos-cx"
+    assert bundle.summary["commands_run"] == len(bundle.raw_outputs)
+
+
+def test_parallel_collect_device_preserves_configured_vendor_on_ambiguous_probe(monkeypatch):
+    """PHASE-055A: a configured vendor with an unrecognized banner keeps its profile instead of generic."""
+    from app.parallel_collector import _collect_device
+
+    captured_commands: List[str] = []
+
+    class FakeConn:
+        async def run(self, command: str, timeout: int | None = None) -> Any:
+            class Result:
+                pass
+
+            captured_commands.append(command)
+            result = Result()
+            if command == "show version":
+                result.exit_status = 0
+                result.stdout = "Unknown custom firmware\nno recognizable banner"
+                result.stderr = ""
+            else:
+                result.exit_status = 0
+                result.stdout = f"output for {command}"
+                result.stderr = ""
+            return result
+
+    device = Device(
+        name="SW01",
+        hostname="10.0.0.1",
+        vendor="cisco",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    async def run_test():
+        monkeypatch.setattr(
+            "app.parallel_collector.asyncssh.connect",
+            lambda *args, **kwargs: FakeAsyncSSHConnect(FakeConn()),
+        )
+        return await _collect_device(device)
+
+    bundle = asyncio.run(run_test())
+
+    assert bundle.summary["vendor"] == "cisco"
+    assert bundle.device_vendor == "cisco"
+    assert "show version" in captured_commands
+    assert "show cdp neighbors detail" in captured_commands or "show lldp neighbors" in captured_commands
+    assert "show system uptime" not in captured_commands
+
+
+def test_parallel_collect_device_reuses_show_version_output(monkeypatch):
+    """PHASE-055A: the identity probe's show version output is retained as profile evidence."""
+    from app.parallel_collector import _collect_device
+
+    captured_commands: List[str] = []
+
+    class FakeConn:
+        async def run(self, command: str, timeout: int | None = None) -> Any:
+            class Result:
+                pass
+
+            captured_commands.append(command)
+            result = Result()
+            if command == "show version":
+                result.exit_status = 0
+                result.stdout = "Cisco IOS Software\nModel: C9200"
+                result.stderr = ""
+            else:
+                result.exit_status = 0
+                result.stdout = f"output for {command}"
+                result.stderr = ""
+            return result
+
+    device = Device(
+        name="SW01",
+        hostname="10.0.0.1",
+        vendor="auto",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    async def run_test():
+        monkeypatch.setattr(
+            "app.parallel_collector.asyncssh.connect",
+            lambda *args, **kwargs: FakeAsyncSSHConnect(FakeConn()),
+        )
+        return await _collect_device(device)
+
+    bundle = asyncio.run(run_test())
+
+    assert captured_commands.count("show version") == 1
+    assert bundle.raw_outputs.get("show version") == "Cisco IOS Software\nModel: C9200"
+    assert bundle.summary["commands_run"] == len(bundle.raw_outputs)

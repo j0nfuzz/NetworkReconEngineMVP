@@ -9,6 +9,7 @@ import asyncssh
 
 from app.checkpoint import state_to_checkpoint
 from app.classification import classify_neighbors
+from app.detector import classify_role, identify_device
 from app.discovery import extract_neighbors
 from app.models import Device, DeviceBundle
 from app.vendor_profiles import get_vendor_commands, validate_device_command_set
@@ -82,23 +83,20 @@ def _reconstruct_pending_devices(
 
 
 async def _collect_device(device: Device) -> DeviceBundle:
-    """Collect a single device using asyncssh."""
+    """Collect a single device using asyncssh.
+
+    An identity probe (``show version``) runs first in the same SSH session.
+    When the probe returns a higher-confidence identity than any pre-populated
+    metadata, the detected vendor/platform/role are adopted. Otherwise the
+    configured/pre-populated identity is preserved so a recognized vendor is
+    not downgraded to ``generic`` because of an unrecognized banner. The
+    probe's ``show version`` output is retained as the profile's
+    ``show version`` evidence to avoid running it twice.
+    """
     summary = _build_summary(device)
     role = (device.metadata.get("role") or {}).get("role")
-
-    try:
-        commands = get_vendor_commands(device.vendor, role=role)
-    except ValueError as exc:
-        summary["status"] = "error"
-        summary["error"] = str(exc)
-        return _make_bundle(device, summary, {}, [])
-
-    invalid = validate_device_command_set(commands)
-    if invalid:
-        summary["status"] = "error"
-        summary["error"] = f"Read-only policy violation for {device.name}: {invalid}"
-        return _make_bundle(device, summary, {}, [])
-
+    platform = None
+    commands: List[str] = []
     raw_outputs: Dict[str, str] = {}
     failed_commands: List[str] = []
 
@@ -111,7 +109,63 @@ async def _collect_device(device: Device) -> DeviceBundle:
             known_hosts=device.known_hosts if device.known_hosts else None,
             login_timeout=device.timeout,
         ) as conn:
+            probe_result = await conn.run("show version", timeout=device.timeout)
+            if probe_result.exit_status != 0:
+                summary["status"] = "error"
+                summary["error"] = f"Identity probe failed: {probe_result.stderr}"
+                return _make_bundle(device, summary, {}, [])
+
+            identity = identify_device(probe_result.stdout)
+            existing_identity = device.metadata.get("identity") or {}
+            existing_confidence = existing_identity.get("confidence", 0.0)
+
+            if identity.confidence > 0 and identity.confidence > existing_confidence:
+                device.vendor = identity.vendor
+                device.metadata["identity"] = {
+                    "vendor": identity.vendor,
+                    "platform": identity.platform,
+                    "model": identity.model,
+                    "confidence": identity.confidence,
+                }
+                role_obj = classify_role(identity, device.name)
+                device.metadata["role"] = {
+                    "role": role_obj.role,
+                    "confidence": role_obj.confidence,
+                }
+                role = role_obj.role
+                platform = identity.platform
+                summary["vendor"] = identity.vendor
+                summary["platform"] = identity.platform
+                summary["model"] = identity.model
+                summary["identity_confidence"] = identity.confidence
+                summary["role"] = role_obj.role
+                summary["role_confidence"] = role_obj.confidence
+            else:
+                role = (device.metadata.get("role") or {}).get("role")
+                platform = existing_identity.get("platform")
+                summary["vendor"] = existing_identity.get("vendor", device.vendor)
+                summary["platform"] = existing_identity.get("platform", "unknown")
+                summary["model"] = existing_identity.get("model", "unknown")
+                summary["identity_confidence"] = existing_confidence
+                existing_role = device.metadata.get("role") or {}
+                summary["role"] = existing_role.get("role", "unknown")
+                summary["role_confidence"] = existing_role.get("confidence", 0.0)
+
+            commands = get_vendor_commands(device.vendor, role=role, platform=platform)
+
+            invalid = validate_device_command_set(commands)
+            if invalid:
+                summary["status"] = "error"
+                summary["error"] = f"Read-only policy violation for {device.name}: {invalid}"
+                return _make_bundle(device, summary, {}, [])
+
+            if "show version" in commands:
+                raw_outputs["show version"] = probe_result.stdout
+                summary["commands_run"] += 1
+
             for command in commands:
+                if command == "show version":
+                    continue
                 try:
                     result = await conn.run(command, timeout=device.timeout)
                     summary["commands_run"] += 1
@@ -124,6 +178,10 @@ async def _collect_device(device: Device) -> DeviceBundle:
                     summary["commands_run"] += 1
                     raw_outputs[command] = f"ERROR: {exc}"
                     failed_commands.append(command)
+    except ValueError as exc:
+        summary["status"] = "error"
+        summary["error"] = str(exc)
+        return _make_bundle(device, summary, raw_outputs, commands)
     except Exception as exc:
         summary["status"] = "unreachable"
         summary["error"] = str(exc)

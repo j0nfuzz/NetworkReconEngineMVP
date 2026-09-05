@@ -1,4 +1,4 @@
-# PROJECT-JOURNAL.md
+  # PROJECT-JOURNAL.md
 
 ## Purpose
 
@@ -3182,3 +3182,166 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-054-TraversalExpansionFieldTestBuildPreparation per its acceptance criteria; schedule field validation of the new traversal defaults against a reachable multi-hop device once built.
+
+---
+
+Date: 2026-09-05
+Agent: Claude
+
+Phase: QwenFindingsDispositionTriage
+
+Changes:
+- Reviewed Terra's REVIEW-QWEN-04-09-2026.md dispositions (accepted: execution-path consistency, recursive-path identity gap, parallel platform-propagation gap, ArubaOS-CX neighbour-discovery concerns, evidence-contract divergence, health-score accuracy; deferred: vendor-command expansion pending DD-013; rejected/superseded: FortiGate/NX-OS profile gaps, silent generic-fallback).
+- Converted the accepted findings into four scoped phases: PHASE-055-DefaultPathIdentityAndPlatformPropagation (highest priority; the recursive/`--target-device` path never probes identity or passes platform, silently bypassing DD-012), PHASE-056-ParallelCollectorEvidenceContractParity, PHASE-057-PartialStatusHealthScorePenalty, PHASE-058-ArubaOSCXLLDPNeighborFormatFieldCapture (data-collection only, prerequisite to any discovery.py parser change).
+- No DDR changes: PHASE-055/056/057 correct existing approved architecture (DD-012's platform-aware selection, established evidence-contract fields, existing health-scoring model) rather than introduce new architectural decisions; PHASE-058 is data-collection only, matching the PHASE-040/046 precedent.
+
+Reason:
+- Qwen findings are not automatically accepted into the SDLC; Terra's reviewer disposition is authoritative. Of the accepted findings, execution-path/identity/platform-propagation is the only one blocking already-approved capability (DD-012) on the default user journey and is selected as the next implementation phase; the remaining three are small, independently scoped follow-ons queued in sequence.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; phases are scoped, not yet implemented.
+
+Next Recommended Action:
+- Implement PHASE-055-DefaultPathIdentityAndPlatformPropagation first; PHASE-056/057/058 may proceed independently once PHASE-055 lands.
+
+---
+
+Date: 2026-09-05
+Agent: Kimi
+
+Phase: PHASE-055-DefaultPathIdentityAndPlatformPropagation
+
+Changes:
+- Implemented identity probing in `app/parallel_collector.py::_collect_device()` using asyncssh `show version` before command selection.
+- Populated `device.metadata["identity"]`/`["role"]` and updated the summary when the probe succeeds, matching the existing non-recursive CLI branch.
+- Passed the resolved `platform` into `get_vendor_commands()` so DD-012 platform-aware profile selection now engages on the parallel / recursive / `--target-device` path.
+- Added four regression tests to `tests/test_parallel_collector.py` covering identity probe execution, ArubaOS-CX profile selection, probe failure handling, and identity overwrite behaviour.
+- Created `docs/Phases/IMPLEMENTED-PHASE-055-DefaultPathIdentityAndPlatformPropagation.md`.
+
+Reason:
+- Terra's REVIEW-QWEN-04-09-2026.md and Claude's phase selection identified the default recursive path as bypassing identity detection and platform-aware selection; this defect caused ArubaOS-CX devices to execute the generic profile. PHASE-055 restores DD-012 on the default path.
+
+Risks Introduced:
+- One extra SSH `show version` round trip per device on the parallel path.
+- Reliance on existing `app/detector.py` heuristics, including known false-positive/model-extraction limitations.
+
+Risks Resolved:
+- Default recursive / `--target-device` collection no longer silently executes the generic profile on platform-detectable devices.
+- Probe failure is now recorded as an error status rather than degrading to generic commands.
+
+Next Recommended Action:
+- Run GPT/Terra review of PHASE-055; if approved, proceed to PHASE-056-ParallelCollectorEvidenceContractParity.
+
+---
+
+Date: 2026-09-05
+Agent: Claude
+
+Phase: PHASE-055-DefaultPathIdentityAndPlatformPropagation (rejection assessment)
+
+Changes:
+- Reviewed Terra's REVIEW-PHASE-055 (Not Approved) and independently reproduced all three findings.
+- Confirmed as a valid defect: `_collect_device()` unconditionally overwrites `device.vendor`/identity metadata with the probe result; `identify_device()` defaults to `vendor="generic"` on an unrecognized banner, so a configured vendor can silently regress to the generic profile.
+- Confirmed as a valid (Major) inefficiency: the probe opens a session and runs `show version`, then a second session reruns the full command set, whose first entry is always `show version` in every profile.
+- Confirmed `tests/test_parallel_collector.py` is currently one physical line and fails `py_compile`/pytest collection; classified this as a tooling/workspace anomaly (PowerShell line-collapse side effect from an earlier session cleanup step), not a defect in Kimi's implementation logic — but it still blocks validation and correctly prevents approval.
+- Determined Terra's rejection stands; PHASE-055 remains open pending remediation.
+- Created `docs/Phases/PHASE-055A-DefaultPathIdentityAndPlatformPropagationRemediation.md` scoping the confidence-gated vendor fix, duplicate-probe correction, and test-file restoration.
+
+Reason:
+- Two of Terra's three findings are genuine code-level defects that must be corrected regardless of the test-file corruption's origin; the phase cannot be approved or closed until both are fixed and re-validated.
+
+Risks Introduced:
+- None (assessment and scoping only).
+
+Risks Resolved:
+- None yet; PHASE-055A has not been implemented.
+
+Next Recommended Action:
+- Implement PHASE-055A-DefaultPathIdentityAndPlatformPropagationRemediation; do not proceed to PHASE-056/057/058 until PHASE-055's identity/platform propagation is Approved.
+
+---
+
+Date: 2026-09-05
+Agent: Kimi
+
+Phase: PHASE-055A-DefaultPathIdentityAndPlatformPropagationRemediation
+
+Changes:
+- Updated `app/parallel_collector.py::_collect_device()` to confidence-gate the vendor/identity overwrite: the probe result only replaces the configured/pre-populated identity when its confidence is strictly greater than the existing identity confidence.
+- Preserved configured/pre-populated vendor and platform when the probe returns an unrecognized/ambiguous banner (confidence 0), preventing silent regression to the generic profile.
+- Combined the identity probe and command collection into a single asyncssh session, reusing the probe's `show version` output as the profile's `show version` evidence instead of running it a second time.
+- Restored `tests/test_parallel_collector.py` from a single collapsed physical line to valid, newline-delimited, importable source.
+- Updated `test_parallel_collect_device_preserves_pre_populated_identity` to assert preservation of a higher-confidence pre-populated identity.
+- Added `test_parallel_collect_device_preserves_configured_vendor_on_ambiguous_probe` regression test.
+- Added `test_parallel_collect_device_reuses_show_version_output` regression test.
+- Created `docs/Phases/IMPLEMENTED-PHASE-055A-DefaultPathIdentityAndPlatformPropagationRemediation.md`.
+
+Reason:
+- Terra's REVIEW-PHASE-055 rejected PHASE-055 for three findings: unconditional vendor overwrite by potentially-generic probe results, duplicate `show version` execution across two SSH sessions, and a corrupted `tests/test_parallel_collector.py` blocking validation. PHASE-055A acceptance criteria required remediating all three.
+
+Risks Introduced:
+- Single-session collection records session failures after the probe as `unreachable` with any partial outputs gathered; this is consistent with the existing partial-evidence contract.
+- Confidence-gating assumes `identify_device()` returns `confidence=0` for unrecognized output.
+
+Risks Resolved:
+- Configured/discovered vendors are no longer silently downgraded to `generic` by an ambiguous probe.
+- Positively-detected devices still receive platform-aware profile selection on the parallel/recursive/`--target-device` path.
+- The extra per-device `show version` round trip is removed.
+- Test suite is executable again and validates the fix.
+
+Next Recommended Action:
+- Submit PHASE-055A for Terra/GPT review; if approved, PHASE-055 can be closed and PHASE-056/057/058 may proceed.
+
+---
+
+Date: 2026-09-05
+Agent: Claude
+
+Phase: PHASE-055A command-accounting rejection disposition
+
+Changes:
+- Confirmed Terra's command-accounting finding: the successful reused `show version` probe is written to `raw_outputs` but does not increment `summary["commands_run"]`, while each remaining profile command does.
+- Classified the defect as a localized implementation-accounting omission, not an architectural or design-decision defect.
+- Confirmed PHASE-055B is the correct, minimal remediation vehicle: count the reused probe exactly once and add a command-count regression assertion while preserving PHASE-055A identity gating and one-session behavior.
+
+Reason:
+- Command evidence and summary accounting must agree; the current parallel path reports one fewer command than it executed for every successful profile containing `show version`.
+
+Risks Introduced:
+- None (disposition only).
+
+Risks Resolved:
+- None; PHASE-055A remains rejected until PHASE-055B is implemented and independently reviewed.
+
+Next Recommended Action:
+- Kimi implements PHASE-055B only, then runs its targeted parallel-collector tests and the full pytest suite for Terra review.
+
+---
+
+Date: 2026-09-05
+Agent: Kimi
+
+Phase: PHASE-055B-DefaultPathIdentityCommandCountRemediation
+
+Changes:
+- Incremented `summary["commands_run"]` in `app/parallel_collector.py::_collect_device()` when the successful identity probe's `show version` output is reused as the selected profile's `show version` evidence.
+- Kept the collection loop skipping the explicit `show version` re-run so the command is executed and counted exactly once.
+- Added `test_parallel_collect_device_commands_run_includes_reused_show_version` regression test asserting `commands_run` equals the number of profile commands/evidence entries.
+- Updated `test_parallel_collect_device_reuses_show_version_output` to assert `commands_run` matches `len(raw_outputs)`.
+- Created `docs/Phases/IMPLEMENTED-PHASE-055B-DefaultPathIdentityCommandCountRemediation.md`.
+
+Reason:
+- Terra's REVIEW-PHASE-055A identified that the reused probe `show version` was recorded in `raw_outputs` but omitted from `commands_run`, causing the parallel collection summary to under-report executed commands by one.
+
+Risks Introduced:
+- None. The accounting change is a single counter increment gated by the same condition that records the reused output.
+
+Risks Resolved:
+- Parallel collection command accounting now matches the number of executed profile commands.
+- The reused `show version` evidence is counted exactly once.
+
+Next Recommended Action:
+- Run Terra/GPT review of PHASE-055B; if approved, re-review PHASE-055/055A closure and proceed to PHASE-056-ParallelCollectorEvidenceContractParity.
