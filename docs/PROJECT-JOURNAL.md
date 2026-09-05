@@ -3445,3 +3445,53 @@ Risks Resolved:
 
 Next Recommended Action:
 - Run Terra/GPT review of PHASE-057; if approved, commit and push the stable checkpoint.
+
+---
+
+Date: 2026-09-05
+Agent: Claude
+
+Phase: PHASE-057 closure assessment
+
+Changes:
+- Confirmed Terra approved PHASE-057 (commit `763694e`, pushed) and independently reproduced its validation: py_compile success, 12 targeted health tests passed, 285 full-suite tests passed.
+- Closed PHASE-057: the health-score blind spot for partial/failed-command collections is remediated with a single, proportionate -15 deduction; successful collections are unaffected; no collector, traversal, LLDP, detection, vendor-profile, or retry/recovery changes were introduced.
+- Confirmed PHASE-058 (ArubaOSCXLLDPNeighborFormatFieldCapture) remains a data-collection-only phase: no source/test files in scope, output limited to a field-evidence markdown artefact, and parser/discovery.py remediation is explicitly deferred pending that evidence.
+
+Reason:
+- PHASE-057 acceptance criteria are fully met and independently reproduced; no accepted finding remains open. Complete-failure health-score semantics are intentionally outside this phase's scope.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- PHASE-057 closed as a stable checkpoint; health scoring no longer misrepresents partial or failed-command collections as fully healthy.
+
+Next Recommended Action:
+- Proceed to PHASE-058-ArubaOSCXLLDPNeighborFormatFieldCapture as a field-evidence-only phase; parser/discovery.py remediation remains blocked until that evidence is captured.
+
+---
+
+Date: 2026-09-05
+Agent: Kimi
+
+Phase: PHASE-058-ArubaOSCXLLDPNeighborFormatFieldCapture
+
+Changes:
+- Read `field_tests/FIELDTEST.MD` before analysing field evidence.
+- Extracted `show lldp neighbor-info detail` output from the existing approved field bundle `field_tests/output1.zip`.
+- Created `docs/FieldEvidence/PHASE-058-20260905-185800-arubacx-lldp-format.md` documenting the observed ArubaOS-CX LLDP field-name mapping, parser-assumption mismatch, and sanitised sample output.
+- Confirmed `app/discovery.py` currently expects `Chassis id:` / `System Name:` and therefore produced `discovered_neighbors: []` for a device with 8 LLDP neighbors present in the raw output.
+- Created `docs/Phases/IMPLEMENTED-PHASE-058-ArubaOSCXLLDPNeighborFormatFieldCapture.md`.
+
+Reason:
+- PHASE-058 acceptance criteria required capturing ArubaOS-CX LLDP evidence to validate current parser assumptions before any parser remediation is approved.
+
+Risks Introduced:
+- None (data-collection phase only; no source changes).
+
+Risks Resolved:
+- The hypothesis that ArubaOS-CX LLDP output does not match current parser assumptions is now supported by field evidence.
+
+Next Recommended Action:
+- A future parser-remediation phase (outside PHASE-058 scope) should update `app/discovery.py` to parse ArubaOS-CX LLDP field labels; consider also capturing `show lldp neighbor-info` (non-detail) for comparison.
