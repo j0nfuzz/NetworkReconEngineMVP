@@ -3345,3 +3345,53 @@ Risks Resolved:
 
 Next Recommended Action:
 - Run Terra/GPT review of PHASE-055B; if approved, re-review PHASE-055/055A closure and proceed to PHASE-056-ParallelCollectorEvidenceContractParity.
+
+---
+
+Date: 2026-09-05
+Agent: Claude
+
+Phase: PHASE-055 workstream closure (055/055A/055B)
+
+Changes:
+- Confirmed Terra approved PHASE-055B (STABLE CHECKPOINT) and independently reproduced its validation: py_compile success, 24 targeted parallel-collector tests passed, 278 full-suite tests passed.
+- Verified commit `cc08e12` (pushed) contains exactly the reviewed PHASE-055/055A/055B source, test, and phase-artefact changes; no unreviewed drift.
+- Closed the PHASE-055 workstream: identity probing, confidence-gated vendor/platform overwrite, single-session probe/collection, and accurate `commands_run` accounting are all now correct on the parallel/recursive/`--target-device` path, restoring DD-012 platform-aware profile selection across that path to parity with the sequential collector.
+
+Reason:
+- All three reviewer-confirmed defects (generic-overwrite risk, duplicate `show version` execution, command-count under-reporting) are remediated and independently re-verified; no accepted finding remains open.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- PHASE-055/055A/055B closed as a stable checkpoint; DD-012 is fully restored on the parallel/recursive/`--target-device` path.
+
+Next Recommended Action:
+- Proceed to PHASE-056-ParallelCollectorEvidenceContractParity.
+
+---
+
+Date: 2026-09-05
+Agent: Kimi
+
+Phase: PHASE-056-ParallelCollectorEvidenceContractParity
+
+Changes:
+- Added `failed_command_details` and `recovered_commands` to `_build_summary()` in `app/parallel_collector.py` so every parallel bundle summary carries the same evidence-contract keys as the sequential collector.
+- Introduced `_build_command_evidence()` helper that records `command`, `error_type`, and `elapsed_seconds` for failed commands, with all AsyncSSH-unavailable fields explicitly set to `None`.
+- Wrapped individual command execution with `time.perf_counter()` in `_collect_device()` to supply `elapsed_seconds` without altering concurrency, ordering, or error handling.
+- Populated `failed_command_details` for non-zero exits and connection-level exceptions; left `recovered_commands` as `[]` because recovery remains sequential-only per DD-007.
+- Added three regression tests in `tests/test_parallel_collector.py` covering failed-command evidence existence, schema/key parity with the sequential collector, and exception-based failure recording.
+
+Reason:
+- Qwen's review and the PHASE-056 assessment confirmed the parallel collector dropped the sequential evidence contract (`failed_command_details`/`recovered_commands`), causing downstream consumers to receive path-inconsistent summaries.
+
+Risks Introduced:
+- Slightly larger parallel-bundle JSON payloads for devices with failed commands.
+
+Risks Resolved:
+- Parallel and sequential collectors now expose the same evidence-contract key set for equivalent failures; downstream health scoring, bundle writers, and troubleshooting consumers no longer need path-specific handling.
+
+Next Recommended Action:
+- Run Terra/GPT review of PHASE-056; if approved, commit and push the stable checkpoint.

@@ -738,3 +738,234 @@ def test_parallel_collect_device_reuses_show_version_output(monkeypatch):
     assert captured_commands.count("show version") == 1
     assert bundle.raw_outputs.get("show version") == "Cisco IOS Software\nModel: C9200"
     assert bundle.summary["commands_run"] == len(bundle.raw_outputs)
+
+
+_EXPECTED_EVIDENCE_KEYS = {
+    "command",
+    "error_type",
+    "elapsed_seconds",
+    "transport_active",
+    "transport_state",
+    "channel_state",
+    "recovery_attempted",
+    "recovery_successful",
+    "original_error_type",
+    "original_elapsed_seconds",
+    "original_stdout",
+    "original_stderr",
+    "original_transport_active",
+    "retry_error",
+    "retry_error_type",
+    "retry_elapsed_seconds",
+}
+
+_ASYNCSSH_UNAVAILABLE_FIELDS = [
+    "transport_active",
+    "transport_state",
+    "channel_state",
+    "recovery_attempted",
+    "recovery_successful",
+    "original_error_type",
+    "original_elapsed_seconds",
+    "original_stdout",
+    "original_stderr",
+    "original_transport_active",
+    "retry_error",
+    "retry_error_type",
+    "retry_elapsed_seconds",
+]
+
+
+def test_parallel_failed_command_details_recorded(monkeypatch):
+    """PHASE-056: failed parallel commands emit command_evidence entries."""
+    from app.parallel_collector import _collect_device
+
+    class FakeConn:
+        async def run(self, command: str, timeout: int | None = None) -> Any:
+            class Result:
+                pass
+
+            result = Result()
+            if command == "show version":
+                result.exit_status = 0
+                result.stdout = "Cisco IOS Software, IOS-XE Software"
+                result.stderr = ""
+            elif command == "show cdp neighbors detail":
+                result.exit_status = 1
+                result.stdout = ""
+                result.stderr = "Command not supported"
+            else:
+                result.exit_status = 0
+                result.stdout = f"output for {command}"
+                result.stderr = ""
+            return result
+
+    device = Device(
+        name="SW01",
+        hostname="10.0.0.1",
+        vendor="auto",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    async def run_test():
+        monkeypatch.setattr(
+            "app.parallel_collector.asyncssh.connect",
+            lambda *args, **kwargs: FakeAsyncSSHConnect(FakeConn()),
+        )
+        return await _collect_device(device)
+
+    bundle = asyncio.run(run_test())
+
+    assert "failed_command_details" in bundle.summary
+    assert "recovered_commands" in bundle.summary
+    assert bundle.summary["recovered_commands"] == []
+    assert len(bundle.summary["failed_command_details"]) == 1
+    detail = bundle.summary["failed_command_details"][0]
+    assert detail["command"] == "show cdp neighbors detail"
+    assert detail["error_type"] == "non_zero_exit"
+    assert isinstance(detail["elapsed_seconds"], float)
+    assert set(detail.keys()) == _EXPECTED_EVIDENCE_KEYS
+    for field in _ASYNCSSH_UNAVAILABLE_FIELDS:
+        assert detail.get(field) is None, field
+
+
+def test_parallel_failed_command_schema_matches_sequential(monkeypatch):
+    """PHASE-056: parallel and sequential summaries expose the same evidence-contract keys."""
+    from app.collector import execute_device_collection
+    from app.parallel_collector import _collect_device
+
+    class FakeParallelConn:
+        async def run(self, command: str, timeout: int | None = None) -> Any:
+            class Result:
+                pass
+
+            result = Result()
+            if command == "show version":
+                result.exit_status = 0
+                result.stdout = "Cisco IOS Software, IOS-XE Software"
+                result.stderr = ""
+            elif command == "show cdp neighbors detail":
+                result.exit_status = 1
+                result.stdout = ""
+                result.stderr = "Command not supported"
+            else:
+                result.exit_status = 0
+                result.stdout = f"output for {command}"
+                result.stderr = ""
+            return result
+
+    class FakeSequentialSSHClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def probe(self):
+            return {"reachable": True}
+
+        def connect(self):
+            return self
+
+        def run_command(self, command, client=None):
+            success = command != "show cdp neighbors detail"
+            return {
+                "success": success,
+                "stdout": "" if not success else f"output for {command}",
+                "stderr": "Command not supported" if not success else "",
+                "error": None if success else "Command not supported",
+                "error_type": None if success else "non_zero_exit",
+                "elapsed_seconds": 0.1,
+                "transport_active": True,
+                "transport_state": "active",
+                "channel_state": "open",
+                "recovery_attempted": False,
+                "recovery_successful": False,
+                "original_error_type": None,
+                "original_elapsed_seconds": None,
+                "original_stdout": None,
+                "original_stderr": None,
+                "original_transport_active": None,
+                "retry_error": None,
+                "retry_error_type": None,
+                "retry_elapsed_seconds": None,
+            }
+
+        def close(self, connection):
+            return None
+
+    parallel_device = Device(
+        name="SW01-PAR",
+        hostname="10.0.0.1",
+        vendor="cisco",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    async def run_parallel():
+        monkeypatch.setattr(
+            "app.parallel_collector.asyncssh.connect",
+            lambda *args, **kwargs: FakeAsyncSSHConnect(FakeParallelConn()),
+        )
+        return await _collect_device(parallel_device)
+
+    parallel_bundle = asyncio.run(run_parallel())
+
+    sequential_device = Device(
+        name="SW01-SEQ",
+        hostname="10.0.0.1",
+        vendor="cisco",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+    monkeypatch.setattr("app.collector.DeviceSSHClient", FakeSequentialSSHClient)
+    sequential_bundle = execute_device_collection(sequential_device)
+
+    assert sorted(parallel_bundle.summary.keys()) == sorted(sequential_bundle.summary.keys())
+    assert (
+        parallel_bundle.summary["failed_commands"]
+        == sequential_bundle.summary["failed_commands"]
+    )
+    parallel_detail = parallel_bundle.summary["failed_command_details"][0]
+    sequential_detail = sequential_bundle.summary["failed_command_details"][0]
+    assert set(parallel_detail.keys()) == set(sequential_detail.keys()) == _EXPECTED_EVIDENCE_KEYS
+
+
+def test_parallel_command_exception_records_error_type(monkeypatch):
+    """PHASE-056: connection-level command exceptions are recorded as failed evidence."""
+    from app.parallel_collector import _collect_device
+
+    class FakeConn:
+        async def run(self, command: str, timeout: int | None = None) -> Any:
+            if command == "show version":
+                class Result:
+                    pass
+
+                result = Result()
+                result.exit_status = 0
+                result.stdout = "Cisco IOS Software, IOS-XE Software"
+                result.stderr = ""
+                return result
+            raise ConnectionError("Connection lost")
+
+    device = Device(
+        name="SW01",
+        hostname="10.0.0.1",
+        vendor="auto",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    async def run_test():
+        monkeypatch.setattr(
+            "app.parallel_collector.asyncssh.connect",
+            lambda *args, **kwargs: FakeAsyncSSHConnect(FakeConn()),
+        )
+        return await _collect_device(device)
+
+    bundle = asyncio.run(run_test())
+
+    exception_details = [
+        d for d in bundle.summary["failed_command_details"] if d["error_type"] == "ConnectionError"
+    ]
+    assert exception_details
+    for field in _ASYNCSSH_UNAVAILABLE_FIELDS:
+        assert exception_details[0].get(field) is None, field

@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import asyncssh
+import time
 
 from app.checkpoint import state_to_checkpoint
 from app.classification import classify_neighbors
@@ -32,6 +33,8 @@ def _build_summary(device: Device) -> Dict[str, Any]:
         "status": "pending",
         "commands_run": 0,
         "failed_commands": [],
+        "failed_command_details": [],
+        "recovered_commands": [],
     }
     identity = device.metadata.get("identity")
     if identity:
@@ -54,6 +57,36 @@ def _make_bundle(device: Device, summary: Dict[str, Any], raw_outputs: Dict[str,
         raw_outputs=raw_outputs,
         failed_commands=failed_commands,
     )
+
+
+def _build_command_evidence(
+    command: str,
+    elapsed_seconds: float,
+    error_type: Optional[str],
+) -> Dict[str, Any]:
+    """Build a command-evidence entry aligned with the sequential collector.
+
+    Asyncssh cannot provide channel/transport introspection or retry state,
+    so those fields are explicitly recorded as ``None``.
+    """
+    return {
+        "command": command,
+        "error_type": error_type,
+        "elapsed_seconds": elapsed_seconds,
+        "transport_active": None,
+        "transport_state": None,
+        "channel_state": None,
+        "recovery_attempted": None,
+        "recovery_successful": None,
+        "original_error_type": None,
+        "original_elapsed_seconds": None,
+        "original_stdout": None,
+        "original_stderr": None,
+        "original_transport_active": None,
+        "retry_error": None,
+        "retry_error_type": None,
+        "retry_elapsed_seconds": None,
+    }
 
 
 def _reconstruct_pending_devices(
@@ -99,6 +132,7 @@ async def _collect_device(device: Device) -> DeviceBundle:
     commands: List[str] = []
     raw_outputs: Dict[str, str] = {}
     failed_commands: List[str] = []
+    failed_command_details: List[Dict[str, Any]] = []
 
     try:
         async with asyncssh.connect(
@@ -166,18 +200,28 @@ async def _collect_device(device: Device) -> DeviceBundle:
             for command in commands:
                 if command == "show version":
                     continue
+                start = time.perf_counter()
                 try:
                     result = await conn.run(command, timeout=device.timeout)
-                    summary["commands_run"] += 1
-                    if result.exit_status == 0:
-                        raw_outputs[command] = result.stdout
-                    else:
-                        raw_outputs[command] = f"ERROR: {result.stderr}"
-                        failed_commands.append(command)
                 except Exception as exc:
+                    elapsed = time.perf_counter() - start
                     summary["commands_run"] += 1
                     raw_outputs[command] = f"ERROR: {exc}"
                     failed_commands.append(command)
+                    failed_command_details.append(
+                        _build_command_evidence(command, elapsed, type(exc).__name__)
+                    )
+                    continue
+                elapsed = time.perf_counter() - start
+                summary["commands_run"] += 1
+                if result.exit_status == 0:
+                    raw_outputs[command] = result.stdout
+                else:
+                    raw_outputs[command] = f"ERROR: {result.stderr}"
+                    failed_commands.append(command)
+                    failed_command_details.append(
+                        _build_command_evidence(command, elapsed, "non_zero_exit")
+                    )
     except ValueError as exc:
         summary["status"] = "error"
         summary["error"] = str(exc)
@@ -189,6 +233,8 @@ async def _collect_device(device: Device) -> DeviceBundle:
 
     summary["status"] = "collected" if not failed_commands else "partial"
     summary["failed_commands"] = failed_commands
+    summary["failed_command_details"] = failed_command_details
+    summary["recovered_commands"] = []
     summary["discovered_neighbors"] = extract_neighbors(device.vendor, raw_outputs)
     return _make_bundle(device, summary, raw_outputs, failed_commands)
 
