@@ -3395,3 +3395,53 @@ Risks Resolved:
 
 Next Recommended Action:
 - Run Terra/GPT review of PHASE-056; if approved, commit and push the stable checkpoint.
+
+---
+
+Date: 2026-09-05
+Agent: Claude
+
+Phase: PHASE-056 closure assessment
+
+Changes:
+- Confirmed Terra approved PHASE-056 (commit `5e27d76`, pushed) and independently reproduced its validation: py_compile success, 27 targeted parallel-collector tests passed, 281 full-suite tests passed.
+- Closed PHASE-056: `failed_command_details`/`recovered_commands` evidence-contract parity between the parallel and sequential collectors is implemented, tested, and reviewed with no open critical/major issues.
+- Investigated a separate research observation (independent review, Section 8) that the default recursive path (no `--target-device`) may not perform identity detection like the `--target-device` parallel path. Confirmed at source level: `app/orchestrator.py::run_recursive_collection()` calls `execute_device_collection()` directly with no identity probe and no `platform`, while `app/parallel_collector.py::_collect_device()` (fixed by PHASE-055/055A/055B) performs its own probe. This is an existing, already-documented architectural gap, distinct from and unaffected by PHASE-056.
+
+Reason:
+- PHASE-056 acceptance criteria are fully met and independently reproduced; no accepted finding remains open. The default-path identity-detection gap is evidenced at the code level but is out of PHASE-056's scope and requires no action to close this phase.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- PHASE-056 closed as a stable checkpoint; parallel/sequential evidence-contract parity is restored.
+
+Next Recommended Action:
+- Proceed to PHASE-057-PartialStatusHealthScorePenalty. Separately, consider a future verification/regression phase for default-recursive-path identity detection parity (candidate, not yet scoped or started).
+
+---
+
+Date: 2026-09-05
+Agent: Kimi
+
+Phase: PHASE-057-PartialStatusHealthScorePenalty
+
+Changes:
+- Updated `app/health.py::score_device_health()` to apply a 15-point penalty and emit a warning when `summary["status"] == "partial"` or `summary["failed_commands"]` is non-empty.
+- Preserved existing CPU, memory, and interface-error thresholds/scoring weights.
+- Added four regression tests in `tests/test_health.py` covering partial status, failed commands, stacked penalties with other issues, and unchanged behaviour for successful collections.
+- Created `docs/Phases/IMPLEMENTED-PHASE-057-PartialStatusHealthScorePenalty.md`.
+
+Reason:
+- Qwen's review accepted that `score_device_health()` was a health-score blind spot: it evaluated only normalized CPU/memory/interface errors, producing 100/empty-warnings bundles that contained failed commands or partial collection status.
+
+Risks Introduced:
+- Health scores for partial collections are now reduced; any downstream automation that expected 100 may need adjustment.
+- The 15-point penalty weight is a judgement call and may require tuning with cross-vendor field evidence.
+
+Risks Resolved:
+- Partial or failed-command bundles no longer report a misleadingly perfect health score.
+
+Next Recommended Action:
+- Run Terra/GPT review of PHASE-057; if approved, commit and push the stable checkpoint.

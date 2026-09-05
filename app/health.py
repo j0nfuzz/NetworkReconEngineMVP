@@ -9,6 +9,13 @@ def score_device_health(summary: Dict[str, Any]) -> Dict[str, Any]:
     warnings: List[str] = []
     critical: List[str] = []
 
+    # Penalise partial or failed command collection; see DD-007 and PHASE-057.
+    failed_commands = summary.get("failed_commands") or []
+    status = summary.get("status")
+    if status == "partial" or failed_commands:
+        warnings.append("Collection incomplete; some commands failed")
+        score -= 15
+
     cpu = summary.get("cpu")
     if isinstance(cpu, (int, float)) and cpu > 80:
         warnings.append("CPU utilisation high")

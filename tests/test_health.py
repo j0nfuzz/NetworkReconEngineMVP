@@ -68,3 +68,55 @@ def test_score_device_output_shape():
     assert isinstance(result["score"], int)
     assert isinstance(result["warnings"], list)
     assert isinstance(result["critical"], list)
+
+
+def test_score_device_partial_status_reduces_score():
+    summary = {
+        "cpu": 45.0,
+        "memory": 50.0,
+        "interface_errors": [],
+        "status": "partial",
+        "failed_commands": ["show cdp neighbors detail"],
+    }
+    result = score_device_health(summary)
+    assert result["score"] == 85
+    assert "Collection incomplete" in result["warnings"][0]
+
+
+def test_score_device_failed_commands_reduces_score():
+    summary = {
+        "cpu": 45.0,
+        "memory": 50.0,
+        "interface_errors": [],
+        "failed_commands": ["show lldp neighbors"],
+    }
+    result = score_device_health(summary)
+    assert result["score"] == 85
+    assert any("Collection incomplete" in warning for warning in result["warnings"])
+
+
+def test_score_device_partial_with_other_issues_stacks_penalties():
+    summary = {
+        "cpu": 85.0,
+        "memory": 50.0,
+        "interface_errors": ["Gi1/0/24"],
+        "status": "partial",
+        "failed_commands": ["show cdp neighbors detail"],
+    }
+    result = score_device_health(summary)
+    assert result["score"] == 60
+    assert any("Collection incomplete" in warning for warning in result["warnings"])
+    assert any("CPU utilisation high" in warning for warning in result["warnings"])
+
+
+def test_score_device_empty_failed_commands_list_unchanged():
+    summary = {
+        "cpu": 45.0,
+        "memory": 50.0,
+        "interface_errors": [],
+        "status": "collected",
+        "failed_commands": [],
+    }
+    result = score_device_health(summary)
+    assert result["score"] == 100
+    assert result["warnings"] == []
