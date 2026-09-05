@@ -12,7 +12,7 @@ import pytest
 import yaml
 
 import app.collector as collector_module
-from app.cli import parse_args, probe_devices, _is_legacy_error, _run_recursive_cli, _prompt_interactive_inventory
+from app.cli import parse_args, probe_devices, _is_legacy_error, _is_valid_target, _run_recursive_cli, _prompt_interactive_inventory
 from app.collector import execute_device_collection, write_bundle
 from app.classification import classify_neighbor_support, classify_neighbors
 from app.detector import detect_vendor_from_show_version
@@ -58,6 +58,194 @@ def test_parse_args_config_is_optional(monkeypatch):
     args = parse_args()
     assert args.config is None
     assert args.output_dir == "output"
+
+
+@pytest.mark.parametrize(
+    "hostname,expected",
+    [
+        ("10.0.0.1", True),
+        ("192.168.2.241", True),
+        ("255.255.255.255", True),
+        ("0.0.0.0", True),
+        ("::1", True),
+        ("fe80::1", True),
+        ("2001:db8::1", True),
+        ("sw01.example.com", True),
+        ("sw01", True),
+        ("192.168.241", False),
+        ("10.0.0.256", False),
+        ("10.0.0", False),
+        ("", False),
+        ("   ", False),
+        ("-invalid.com", False),
+        ("invalid-.com", False),
+    ],
+)
+def test_is_valid_target(hostname, expected):
+    assert _is_valid_target(hostname) is expected
+
+
+def test_invalid_target_fails_before_ssh_probe(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(
+        "app.cli.load_devices",
+        lambda _path: [
+            {
+                "name": "bad-device",
+                "hostname": "192.168.241",
+                "vendor": "auto",
+                "username": "admin",
+                "password": "<PASSWORD-01>",
+            }
+        ],
+    )
+
+    def fail_if_probed(*args, **kwargs):
+        raise AssertionError("probe boundary should not be reached for invalid target")
+
+    monkeypatch.setattr("app.cli.probe_devices", fail_if_probed)
+    monkeypatch.setattr("app.cli.execute_device_collection", fail_if_probed)
+    monkeypatch.setattr("app.cli.run_recursive_collection", fail_if_probed)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        str(tmp_path / "devices.yml"),
+        "--output-dir",
+        str(tmp_path),
+    ])
+
+    from app.cli import main
+
+    assert main() == 1
+    captured = capsys.readouterr().out
+    assert "Invalid target '192.168.241'" in captured
+    assert "Provide a valid IPv4, IPv6, or DNS hostname" in captured
+
+
+def test_empty_target_fails_before_ssh_probe(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(
+        "app.cli.load_devices",
+        lambda _path: [
+            {
+                "name": "empty-device",
+                "hostname": "",
+                "vendor": "auto",
+                "username": "admin",
+                "password": "<PASSWORD-01>",
+            }
+        ],
+    )
+
+    def fail_if_probed(*args, **kwargs):
+        raise AssertionError("probe boundary should not be reached for empty target")
+
+    monkeypatch.setattr("app.cli.probe_devices", fail_if_probed)
+    monkeypatch.setattr("app.cli.execute_device_collection", fail_if_probed)
+    monkeypatch.setattr("app.cli.run_recursive_collection", fail_if_probed)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        str(tmp_path / "devices.yml"),
+        "--output-dir",
+        str(tmp_path),
+    ])
+
+    from app.cli import main
+
+    assert main() == 1
+    captured = capsys.readouterr().out
+    assert "Invalid target" in captured
+
+
+def test_valid_target_proceeds_to_collection(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "app.cli.load_devices",
+        lambda _path: [
+            {
+                "name": "good-device",
+                "hostname": "192.168.2.241",
+                "vendor": "auto",
+                "username": "admin",
+                "password": "<PASSWORD-01>",
+            }
+        ],
+    )
+
+    captured = {}
+
+    def fake_execute(device, dry_run=False):
+        captured["device"] = device
+        return DeviceBundle(
+            device_name=device.name,
+            device_vendor=device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+
+    monkeypatch.setattr("app.cli.execute_device_collection", fake_execute)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        str(tmp_path / "devices.yml"),
+        "--output-dir",
+        str(tmp_path),
+        "--no-recurse",
+        "--dry-run",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert captured["device"].hostname == "192.168.2.241"
+
+
+def test_valid_hostname_proceeds_to_collection(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "app.cli.load_devices",
+        lambda _path: [
+            {
+                "name": "good-device",
+                "hostname": "sw01.lab.example.com",
+                "vendor": "auto",
+                "username": "admin",
+                "password": "<PASSWORD-01>",
+            }
+        ],
+    )
+
+    captured = {}
+
+    def fake_execute(device, dry_run=False):
+        captured["device"] = device
+        return DeviceBundle(
+            device_name=device.name,
+            device_vendor=device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "dry-run-success", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+
+    monkeypatch.setattr("app.cli.execute_device_collection", fake_execute)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        str(tmp_path / "devices.yml"),
+        "--output-dir",
+        str(tmp_path),
+        "--no-recurse",
+        "--dry-run",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert captured["device"].hostname == "sw01.lab.example.com"
 
 
 def test_vendor_profile_cisco():

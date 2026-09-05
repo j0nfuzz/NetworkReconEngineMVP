@@ -4,6 +4,8 @@ import argparse
 import getpass
 import json
 import os
+import re
+import socket
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
@@ -174,6 +176,36 @@ def _run_recursive_cli(
             "status": bundle.summary.get("status"),
             "summary": bundle.summary,
         })
+
+
+_IPV4_RE = re.compile(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
+_HOSTNAME_RE = re.compile(
+    r"^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*\.?$"
+)
+
+
+def _is_valid_target(hostname: str) -> bool:
+    """Return True if hostname is a syntactically valid IPv4, IPv6, or DNS hostname."""
+    if not hostname or not isinstance(hostname, str):
+        return False
+    hostname = hostname.strip()
+    if not hostname:
+        return False
+    if len(hostname) > 253:
+        return False
+
+    if re.match(r"^[0-9.]+$", hostname):
+        if not _IPV4_RE.match(hostname):
+            return False
+        return all(0 <= int(octet) <= 255 for octet in hostname.split("."))
+
+    try:
+        socket.inet_pton(socket.AF_INET6, hostname)
+        return True
+    except OSError:
+        pass
+
+    return bool(_HOSTNAME_RE.match(hostname))
 
 
 def _is_legacy_error(text: str) -> bool:
@@ -365,6 +397,14 @@ def main() -> int:
     try:
         devices_data = load_devices(config_path)
         devices = [Device.from_dict(item) for item in devices_data]
+
+        for device in devices:
+            if not _is_valid_target(device.hostname):
+                print(
+                    f"Invalid target '{device.hostname}' for device '{device.name}'. "
+                    "Provide a valid IPv4, IPv6, or DNS hostname."
+                )
+                return 1
 
         if args.probe:
             results = probe_devices(devices)

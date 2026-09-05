@@ -3653,3 +3653,100 @@ Risks Resolved:
 
 Next Recommended Action:
 - Run Terra/GPT review of PHASE-062; if approved, commit and push the stable checkpoint.
+
+---
+
+Date: 2026-09-05
+Agent: Claude
+
+Phase: PHASE-062 closure assessment
+
+Changes:
+- Confirmed Terra approved PHASE-062 (APPROVED, no critical/major issues) and independently verified the stable checkpoint: commit a3195fe is at HEAD and pushed to origin/master, working tree clean.
+- Closed PHASE-062: recursive --verbose output now surfaces the existing SSH probe error string when identity detection is skipped due to an unreachable device, resolving the diagnostic-latency gap identified during ArubaOSCXLLDPFieldValidation ("192.168.241" malformed-target investigation).
+- No DDR change required: DD-015 remains unchanged; this was an observability-only addition, not an architectural decision.
+
+Reason:
+- PHASE-062 acceptance criteria are fully met and independently reproduced; no accepted finding remains open.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Recursive-path verbose output no longer hides the root-cause probe error for unreachable targets.
+
+Next Recommended Action:
+- Architect selects next implementation phase; no further action on PHASE-062.
+
+---
+
+Date: 2026-09-05
+Agent: Kimi
+
+Phase: PHASE-063-TargetInputPreflightValidation
+
+Changes:
+- Added _is_valid_target() helper in app/cli.py to validate IPv4, IPv6, and DNS hostname syntax without DNS lookups.
+- Added pre-flight validation in app/cli.py::main() after device loading and before any SSH probe/collection activity.
+- Added regression tests in tests/test_cli.py: parametrized syntax validation, malformed IPv4 fail-fast, empty target fail-fast, and valid IPv4/hostname proceeding to collection.
+- Created docs/Phases/PHASE-063-TargetInputPreflightValidation.md and docs/Phases/IMPLEMENTED-PHASE-063-TargetInputPreflightValidation.md.
+
+Reason:
+- The field incident root cause ("192.168.241") was operator input error. PHASE-062 made the failure visible; PHASE-063 prevents the class entirely by rejecting syntactically invalid targets before SSH/DNS activity.
+
+Risks Introduced:
+- Overly strict hostname matching could reject unusual but valid hostnames; mitigated by permissive RFC-1123-style label matching and IPv6 socket fallback.
+
+Risks Resolved:
+- Malformed target input no longer reaches the SSH probe layer, eliminating recurrence risk of the "192.168.241" diagnostic-latency class.
+
+Next Recommended Action:
+- Run Terra/GPT review of PHASE-063; if approved, commit and push the stable checkpoint.
+
+---
+
+Date: 2026-09-05
+Agent: Kimi
+
+Phase: PHASE-063A-TargetInputPreflightValidationTestRemediation
+
+Changes:
+- Extended tests/test_cli.py::test_invalid_target_fails_before_ssh_probe and test_empty_target_fails_before_ssh_probe to monkeypatch both app.cli.probe_devices and app.cli.execute_device_collection to raise AssertionError if invoked.
+- Both tests now prove malformed and empty targets return exit code 1 and emit the expected validation message without ever reaching the SSH/probe boundary.
+- Created docs/Phases/PHASE-063A-TargetInputPreflightValidationTestRemediation.md and docs/Phases/IMPLEMENTED-PHASE-063A-TargetInputPreflightValidationTestRemediation.md.
+
+Reason:
+- Terra's review (REVIEW-PHASE-063) found the original fail-fast tests did not prove validation occurred before SSH activity; the nonexistent config path could have caused earlier failure. Strengthening the tests closes the review finding while leaving the implementation unchanged.
+
+Risks Introduced:
+- None (test-only change).
+
+Risks Resolved:
+- PHASE-063 acceptance criterion "fail before SSH activity" is now explicitly asserted, not merely implied.
+
+Next Recommended Action:
+- Run Terra/GPT re-review of PHASE-063/063A; if approved, commit and push the stable checkpoint.
+
+---
+
+Date: 2026-09-05
+Agent: Kimi
+
+Phase: PHASE-063B-TargetInputPreflightValidationRecursiveProbeTestRemediation
+
+Changes:
+- Updated tests/test_cli.py::test_invalid_target_fails_before_ssh_probe and test_empty_target_fails_before_ssh_probe to additionally monkeypatch app.cli.run_recursive_collection, so reaching the default recursive collection path raises AssertionError.
+- Retained existing app.cli.probe_devices and app.cli.execute_device_collection guards.
+- Created docs/Phases/PHASE-063B-TargetInputPreflightValidationRecursiveProbeTestRemediation.md and docs/Phases/IMPLEMENTED-PHASE-063B-TargetInputPreflightValidationRecursiveProbeTestRemediation.md.
+
+Reason:
+- Terra's review (REVIEW-PHASE-063A) correctly identified that the default CLI invocation (no --probe, no --no-recurse) routes through main() → _run_recursive_cli() → run_recursive_collection(), so PHASE-063A's patched boundaries did not fully block the actual SSH/probe path.
+
+Risks Introduced:
+- None (test-only change).
+
+Risks Resolved:
+- Fail-fast tests now prove invalid/empty targets are rejected before any SSH/probe or recursive collection boundary can be reached.
+
+Next Recommended Action:
+- Run Terra/GPT re-review of PHASE-063B; if approved, commit and push the stable checkpoint.
