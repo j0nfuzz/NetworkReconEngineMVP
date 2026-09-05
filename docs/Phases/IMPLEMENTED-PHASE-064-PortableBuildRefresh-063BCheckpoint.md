@@ -16,10 +16,10 @@ VALIDATION:
 - Full test suite: 316 passed, 1 warning.
 - build_portable.py executed successfully; embedded bundle produced at dist/NetworkReconEngine.zip (~28.2 MB).
 - Build manifest verified:
-  - commit_sha: 5b591529bb56e1d3ac095c6288ef2b0919bfe352 (matches HEAD)
-  - dirty: true (untracked PHASE-064.md in working tree)
-  - patch_checksum: empty because the working tree contains only an untracked file and no diff patch
-  - build_timestamp: 2026-09-06T00:05:20Z
+  - commit_sha: d4ed976f97ce76fea3f0193e5cd072b1e391f2bb (matches current HEAD)
+  - dirty: false
+  - patch_checksum: empty (correct for a clean working tree)
+  - build_timestamp: 2026-09-06T00:15:06Z
 - Config hygiene verified:
   - config/devices.yml: absent
   - config/interactive_devices.yml: absent
@@ -27,6 +27,9 @@ VALIDATION:
   - config/interactive_devices.yml.example: present
 - Extracted build launchability verified:
   - Start_NetworkRecon.cmd --help returned expected CLI help output.
+- Notes on re-execution:
+  - Initial build was generated against a not-yet-fully-committed working tree (untracked review artefact), causing dirty=true with empty patch_checksum.
+  - After committing the review artefact and achieving a clean tree, PHASE-064 was re-executed without source changes, producing the provenance-valid build recorded above.
 
 DDR UPDATES:
 UNCHANGED DD:2026-09-04 (DD-015)

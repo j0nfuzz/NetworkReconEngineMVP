@@ -3756,6 +3756,33 @@ Next Recommended Action:
 Date: 2026-09-06
 Agent: Kimi
 
+Phase: PHASE-064-PortableBuildRefresh-063BCheckpoint (re-execution)
+
+Changes:
+- Committed the outstanding Terra review artefact (docs/Phases/REVIEW-PHASE-064-PortableBuildRefresh-063BCheckpoint.md), achieving a fully clean working tree.
+- Re-executed the existing PHASE-060 embedded build pipeline against the clean checkpoint (d4ed976f97ce76fea3f0193e5cd072b1e391f2bb) without modifying any source code or build logic.
+- Generated a provenance-valid portable build at dist/NetworkReconEngine.zip containing all approved changes through PHASE-063B.
+- Verified build_manifest.json provenance: dirty=false, commit SHA matches HEAD, checksum empty as expected for a clean tree.
+- Verified config hygiene (only *.yml.example present) and extracted launchability (--help returns expected output).
+- Updated docs/Phases/IMPLEMENTED-PHASE-064-PortableBuildRefresh-063BCheckpoint.md to reflect the clean-tree rebuild.
+
+Reason:
+- Terra rejected the initial PHASE-064 build because it was generated before the review artefact was committed, producing dirty=true with an empty patch_checksum.
+
+Risks Introduced:
+- None (build execution only).
+
+Risks Resolved:
+- A field-validation-ready portable build now exists with valid provenance.
+
+Next Recommended Action:
+- Run Terra/GPT re-review of PHASE-064; if approved, close the phase and hand off to ArubaOSCXLLDPFieldValidation using dist/NetworkReconEngine.zip.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
 Phase: PHASE-064-PortableBuildRefresh-063BCheckpoint
 
 Changes:
