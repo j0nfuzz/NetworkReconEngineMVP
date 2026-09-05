@@ -6,7 +6,63 @@ from typing import Any, Dict, List, Optional
 from app.checkpoint import state_to_checkpoint
 from app.classification import classify_neighbors
 from app.collector import execute_device_collection
+from app.detector import classify_role, identify_device
 from app.models import Device, DeviceBundle
+from app.ssh_client import DeviceSSHClient
+
+
+def _existing_identity_confidence(device: Device) -> float:
+    identity = device.metadata.get("identity")
+    if isinstance(identity, dict):
+        return float(identity.get("confidence", 0.0))
+    return 0.0
+
+
+def _probe_identity(device: Device) -> None:
+    """Probe device identity and update vendor/platform/role metadata when more confident.
+
+    Mutates ``device`` in place.  Any failure leaves the device unchanged so that
+    collection can still proceed with the original vendor/platform hints.
+    """
+    existing_confidence = _existing_identity_confidence(device)
+
+    client = DeviceSSHClient(
+        hostname=device.hostname,
+        username=device.username,
+        password=device.password,
+        port=device.port,
+        timeout=device.timeout,
+        host_key_policy=device.host_key_policy,
+        known_hosts=device.known_hosts,
+    )
+    probe = client.probe()
+    if not probe.get("reachable"):
+        return
+
+    connection = None
+    try:
+        connection = client.connect()
+        result = client.run_command("show version", client=connection)
+        identity = identify_device(result.get("stdout", ""))
+        if identity.confidence > 0 and identity.confidence > existing_confidence:
+            device.vendor = identity.vendor
+            device.metadata["identity"] = {
+                "vendor": identity.vendor,
+                "platform": identity.platform,
+                "model": identity.model,
+                "confidence": identity.confidence,
+            }
+            role = classify_role(identity, device.name)
+            device.metadata["role"] = {"role": role.role, "confidence": role.confidence}
+        elif existing_confidence > 0 and device.vendor in ("auto", "unknown"):
+            existing = device.metadata.get("identity") or {}
+            existing_vendor = existing.get("vendor")
+            if existing_vendor:
+                device.vendor = existing_vendor
+    except Exception:
+        return
+    finally:
+        client.close(connection)
 
 
 def _reconstruct_pending_devices(
@@ -70,6 +126,9 @@ def run_recursive_collection(
         if device.name in visited:
             continue
         visited.add(device.name)
+
+        if device.vendor in ("auto", "unknown"):
+            _probe_identity(device)
 
         bundle = execute_device_collection(device)
         bundles[device.name] = bundle

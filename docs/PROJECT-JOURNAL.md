@@ -3495,3 +3495,134 @@ Risks Resolved:
 
 Next Recommended Action:
 - A future parser-remediation phase (outside PHASE-058 scope) should update `app/discovery.py` to parse ArubaOS-CX LLDP field labels; consider also capturing `show lldp neighbor-info` (non-detail) for comparison.
+
+---
+
+Date: 2026-09-05
+Agent: Kimi
+
+Phase: PHASE-059-ArubaOSCXLLDPParserRemediation
+
+Changes:
+- Updated `app/discovery.py::_parse_lldp_neighbors()` to recognize ArubaOS-CX LLDP field labels (`Neighbor System-Name`, `Neighbor Chassis-ID`, `Neighbor Management-Address`) while preserving existing generic labels (`System Name:`, `Chassis id:`).
+- Added chassis-id-based block splitting so ArubaOS-CX per-neighbor records are correctly bounded without removing existing delimiters.
+- Implemented neighbor identity fallback: `Neighbor System-Name` → `Neighbor Management-Address` → IPv4 chassis-id → raw chassis-id.
+- Added IP fallback from `Neighbor Management-Address` when the chassis-id is not an IPv4 address.
+- Created `tests/test_discovery.py` with regression tests using the sanitised PHASE-058 field evidence.
+- Created `docs/Phases/IMPLEMENTED-PHASE-059-ArubaOSCXLLDPParserRemediation.md`.
+
+Reason:
+- PHASE-059 acceptance criteria required an additive parser remediation to make ArubaOS-CX LLDP neighbor discovery functional based on the field evidence captured in PHASE-058.
+
+Risks Introduced:
+- Parser changes could regress other vendors if LLDP field labels overlap; mitigated by additive matching and full regression suite.
+- Only one ArubaOS-CX evidence bundle exists; unseen edge cases remain unverified.
+
+Risks Resolved:
+- ArubaOS-CX `show lldp neighbor-info detail` output now produces non-empty `discovered_neighbors` instead of an empty list.
+
+Next Recommended Action:
+- Run Terra/GPT review of PHASE-059; if approved, commit and push the stable checkpoint.
+
+---
+
+Date: 2026-09-05
+Agent: Claude
+
+Phase: PHASE-059A closure assessment
+
+Changes:
+- Confirmed Terra approved PHASE-059A and independently reproduced its validation: py_compile pass, 4 discovery tests, 11 targeted CDP/LLDP tests, 289 full-suite tests passed.
+- Closed PHASE-059A: ArubaOS-CX LLDP records are now bounded by `Port :`, the cross-record association defect from PHASE-059 is resolved, and the strengthened regression detects the previously rejected behaviour. Generic LLDP and CDP parsing are unaffected.
+- No DDR change required: DD-015 remains unchanged; this was a scoped bug fix, not an architectural decision.
+
+Reason:
+- PHASE-059A acceptance criteria are fully met and independently reproduced; no accepted finding remains open.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- ArubaOS-CX neighbour discovery no longer cross-associates fields from adjacent LLDP records.
+
+Next Recommended Action:
+- Commit and push the PHASE-059A stable checkpoint (app/discovery.py, tests/test_discovery.py, docs/Phases/PHASE-059*, docs/Phases/IMPLEMENTED-PHASE-059A*, docs/Phases/REVIEW-PHASE-059A*).
+- Proceed to ArubaOSCXLLDPFieldValidation as the next priority; the default-recursive-path identity/platform gap (noted at PHASE-056 closure) remains a valid but lower-urgency candidate since it is a known, unaffected architectural gap rather than a data-correctness defect.
+
+---
+
+Date: 2026-09-05
+Agent: Claude
+
+Phase: Field-validation build-review disposition
+
+Changes:
+- Confirmed PHASE-059A closure stands unmodified; the build-review rejection identified zero parser/discovery defects and is entirely a packaging/provenance concern in build_portable.py's embedded-runtime bundling, outside PHASE-059A's FILES scope (app/discovery.py, tests/test_discovery.py).
+- Classified the two build-review findings: (1) config/devices.yml and config/interactive_devices.yml bundled into the portable ZIP is a packaging-hygiene defect (build_portable.py stages the entire config/ directory without excluding gitignored, credential-bearing files); (2) the embedded portable bundle carries no git metadata, so app/provenance.py's git-subprocess-based capture cannot resolve head_commit_sha or the dirty-tree patch when executed from the extracted bundle, defeating DD-008's field-evidence traceability guarantee for portable-build-collected evidence.
+- Determined no DDR change is required: DD-008 itself (provenance capture is mandatory) is not violated in principle; the portable build packaging simply does not yet satisfy it. This is a scoped packaging-phase gap, not a reconsideration of DD-008.
+- Created PHASE-060-PortableBuildPackagingAndProvenanceHygiene.md scope to define the minimum remediation before a field-validation build may be produced for ArubaOSCXLLDPFieldValidation.
+
+Reason:
+- Governance requires build-readiness defects to be dispositioned separately from the phase whose code they package; conflating them would incorrectly reopen an already-closed, independently-validated bug-fix phase.
+
+Risks Introduced:
+- None (assessment-only; no code changes made).
+
+Risks Resolved:
+- Clarified that PHASE-059A's closure is unaffected by build packaging defects, preventing incorrect phase reopening.
+
+Next Recommended Action:
+- Implement PHASE-060-PortableBuildPackagingAndProvenanceHygiene (build_portable.py only) to exclude local config/*.yml from the packaged bundle and embed a static build-manifest (commit SHA, dirty flag, patch checksum, build timestamp) at package time so field-collected evidence remains traceable without relying on runtime git subprocess calls.
+- ArubaOSCXLLDPFieldValidation remains OPEN; do not attempt field collection until PHASE-060 produces an approved build.
+
+---
+
+Date: 2026-09-05
+Agent: Claude
+
+Phase: PHASE-060 closure assessment
+
+Changes:
+- Confirmed Terra approved the PHASE-060 build (BUILD APPROVED FOR FIELD VALIDATION) and independently reproduced its validation: py_compile pass, 4 test_build_portable.py tests, 290 full-suite tests, archive inspection (devices.yml/interactive_devices.yml absent, *.yml.example present, build_manifest.json present with commit SHA/dirty/timestamp/patch checksum), and successful extracted-bundle launch.
+- Closed PHASE-060: both accepted build-review findings (credential-bearing config packaging, absent durable provenance) are remediated; scope remained limited to build_portable.py and tests/test_build_portable.py with no discovery/parser/collector/orchestrator/health changes.
+- No DDR change required: DD-008's provenance mandate is now satisfied for the portable build path via a build-time manifest; this is an implementation of existing governance, not a new decision.
+
+Reason:
+- PHASE-060 acceptance criteria are fully met and independently reproduced; no accepted finding remains open.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Portable field-validation builds no longer risk distributing local credentials and now carry durable, checksum-based provenance without depending on runtime .git access.
+
+Next Recommended Action:
+- Commit and push the PHASE-060 stable checkpoint (build_portable.py, tests/test_build_portable.py, docs/Phases/PHASE-060*, docs/Phases/IMPLEMENTED-PHASE-060*, docs/Phases/REVIEW-PHASE-060*), alongside the still-uncommitted PHASE-059A checkpoint.
+- Field execution may proceed using the approved build. ArubaOSCXLLDPFieldValidation remains OPEN pending collection and review of fresh field evidence; no field evidence exists yet.
+
+---
+
+Date: 2026-09-05
+Agent: Kimi
+
+Phase: PHASE-061-DefaultRecursivePathIdentityPropagation
+
+Changes:
+- Added identity detection to run_recursive_collection() via a new _probe_identity() helper in app/orchestrator.py.
+- Probed devices whose vendor is "auto" or "unknown" before execute_device_collection() using DeviceSSHClient and identify_device().
+- Applied PHASE-055A confidence-gating: probe result overwrites device.vendor and metadata["identity"] only when the probe confidence is strictly greater than the existing identity confidence.
+- Preserved traversal, neighbor enqueueing, checkpointing, and commands_run/failed_commands accounting.
+- Added four regression tests in tests/test_orchestrator.py: vendor="auto" resolves to detected vendor, resumed pending vendor="unknown" resolves, higher-confidence identity is preserved, and probe failure does not block collection.
+
+Reason:
+- Field execution proved the default recursive path passed vendor="auto" into execute_device_collection(), causing command-profile resolution to fall back to the generic profile before any identity detection occurred. PHASE-061 closes that gap without changing collector.py, parallel_collector.py, discovery.py, vendor_profiles.py, health scoring, SSH probe logic, or CLI arguments.
+
+Risks Introduced:
+- One extra SSH connection per auto/unknown device on the recursive path; acceptable because collector.py cannot be modified to reuse its session.
+
+Risks Resolved:
+- Default recursive collections no longer silently use the generic profile for vendor="auto" devices when identity detection succeeds.
+
+Next Recommended Action:
+- Run Terra/GPT review of PHASE-061; if approved, commit alongside the pending PHASE-059A and PHASE-060 checkpoints.
+- The separate "unreachable" field symptom remains explicitly out of scope and must not be addressed as part of this phase.
