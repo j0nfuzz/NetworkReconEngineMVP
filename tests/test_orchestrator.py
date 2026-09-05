@@ -379,6 +379,7 @@ def test_probe_failure_does_not_block_collection(monkeypatch):
 
     result = run_recursive_collection(seed)
     assert result["successful"] == ["SW01"]
+    assert result["probe_errors"] == {"SW01": "simulated failure"}
     sw01 = collector.calls[0]
     assert sw01.vendor == "auto"
     assert "identity" not in sw01.metadata or not sw01.metadata.get("identity")

@@ -18,11 +18,13 @@ def _existing_identity_confidence(device: Device) -> float:
     return 0.0
 
 
-def _probe_identity(device: Device) -> None:
+def _probe_identity(device: Device) -> Optional[str]:
     """Probe device identity and update vendor/platform/role metadata when more confident.
 
     Mutates ``device`` in place.  Any failure leaves the device unchanged so that
     collection can still proceed with the original vendor/platform hints.
+
+    Returns the probe error string when the device is unreachable, otherwise ``None``.
     """
     existing_confidence = _existing_identity_confidence(device)
 
@@ -37,7 +39,7 @@ def _probe_identity(device: Device) -> None:
     )
     probe = client.probe()
     if not probe.get("reachable"):
-        return
+        return str(probe.get("error") or "")
 
     connection = None
     try:
@@ -60,9 +62,11 @@ def _probe_identity(device: Device) -> None:
             if existing_vendor:
                 device.vendor = existing_vendor
     except Exception:
-        return
+        return None
     finally:
         client.close(connection)
+
+    return None
 
 
 def _reconstruct_pending_devices(
@@ -120,6 +124,8 @@ def run_recursive_collection(
     for device in queue:
         queued.add(device.name)
 
+    probe_errors: Dict[str, str] = {}
+
     while queue and len(visited) < max_devices:
         device = queue.popleft()
         queued.discard(device.name)
@@ -128,7 +134,9 @@ def run_recursive_collection(
         visited.add(device.name)
 
         if device.vendor in ("auto", "unknown"):
-            _probe_identity(device)
+            probe_error = _probe_identity(device)
+            if probe_error:
+                probe_errors[device.name] = probe_error
 
         bundle = execute_device_collection(device)
         bundles[device.name] = bundle
@@ -194,4 +202,5 @@ def run_recursive_collection(
         "failed": failed,
         "unsupported": unsupported,
         "bundles": bundles,
+        "probe_errors": probe_errors,
     }

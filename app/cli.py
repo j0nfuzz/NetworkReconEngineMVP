@@ -161,6 +161,9 @@ def _run_recursive_cli(
         )
         bundle_items = result["bundles"].items()
 
+    for name, error in result.get("probe_errors", {}).items():
+        log_verbose(f"[verbose] Probe error for {name}: {error}")
+
     for name, bundle in bundle_items:
         log_verbose(f"[verbose] Finished collection for {name}: {bundle.summary.get('status')}")
         device_dir = write_bundle(bundle, output_root)

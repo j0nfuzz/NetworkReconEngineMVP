@@ -3626,3 +3626,30 @@ Risks Resolved:
 Next Recommended Action:
 - Run Terra/GPT review of PHASE-061; if approved, commit alongside the pending PHASE-059A and PHASE-060 checkpoints.
 - The separate "unreachable" field symptom remains explicitly out of scope and must not be addressed as part of this phase.
+
+---
+
+Date: 2026-09-05
+Agent: Kimi
+
+Phase: PHASE-062-RecursiveCollectionProbeDiagnosticVisibility
+
+Changes:
+- Changed app/orchestrator.py::_probe_identity() to return Optional[str], surfacing the probe error when the device is unreachable.
+- Updated app/orchestrator.py::run_recursive_collection() to accumulate probe errors in a "probe_errors" dict and return it in the result dict.
+- Updated app/cli.py::_run_recursive_cli() to log each probe error via log_verbose() before the final collection-status line.
+- Extended tests/test_orchestrator.py::test_probe_failure_does_not_block_collection to assert probe_errors contains the unreachable reason.
+- Added tests/test_cli.py::test_run_recursive_cli_verbose_logs_probe_errors proving the error appears in verbose CLI output.
+- Created docs/Phases/PHASE-062-RecursiveCollectionProbeDiagnosticVisibility.md and docs/Phases/IMPLEMENTED-PHASE-062-RecursiveCollectionProbeDiagnosticVisibility.md.
+
+Reason:
+- The malformed-target field issue ("192.168.241") produced vendor="auto"/status="unreachable" symptoms, but the actual root cause "[Errno 11001] getaddrinfo failed" was only discoverable through later bundle analysis. Surfacing the existing probe error in recursive --verbose output removes that diagnostic latency without changing SSH, collection, or identity-detection behaviour.
+
+Risks Introduced:
+- None. The change is observability-only; all existing collection, confidence-gating and identity-detection paths are preserved.
+
+Risks Resolved:
+- Closes the recursive-path verbose diagnostic gap that delayed root-cause identification of unreachable targets during identity probing.
+
+Next Recommended Action:
+- Run Terra/GPT review of PHASE-062; if approved, commit and push the stable checkpoint.

@@ -1546,6 +1546,54 @@ def test_recursive_cli_writes_bundle_manifest(monkeypatch, tmp_path):
     assert (tmp_path / "topology.json").exists()
 
 
+def test_run_recursive_cli_verbose_logs_probe_errors(monkeypatch, tmp_path):
+    """Recursive verbose output surfaces probe errors returned by the orchestrator."""
+    logs: list[str] = []
+
+    def log_verbose(message: str) -> None:
+        logs.append(message)
+
+    seed = Device(name="seed-sw", hostname="10.0.0.1", vendor="cisco")
+    bundle_summary: dict[str, object] = {"devices": []}
+
+    def fake_run_recursive_collection(*args, **kwargs):
+        bundle = DeviceBundle(
+            device_name=seed.name,
+            device_vendor=seed.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "unreachable", "commands_run": 0, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+        return {
+            "successful": [],
+            "failed": [seed.name],
+            "unsupported": [],
+            "bundles": {seed.name: bundle},
+            "probe_errors": {seed.name: "[Errno 11001] getaddrinfo failed"},
+        }
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+    monkeypatch.setattr("app.cli.load_default_credentials", lambda _path: {})
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+
+    _run_recursive_cli(
+        seed,
+        str(tmp_path / "devices.yml"),
+        tmp_path,
+        bundle_summary,
+        log_verbose,
+        checkpoint_file=None,
+        dry_run=False,
+        target_device=None,
+    )
+
+    assert any(
+        "[verbose] Probe error for seed-sw: [Errno 11001] getaddrinfo failed" in msg
+        for msg in logs
+    )
+
+
 def test_non_recursive_path_unchanged(monkeypatch, tmp_path):
     """Without --recursive the CLI still iterates devices and writes the manifest."""
     device_dict = {
