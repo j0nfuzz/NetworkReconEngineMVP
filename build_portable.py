@@ -19,6 +19,7 @@
 #   .\.venv\Scripts\python.exe -m build_portable --legacy
 
 import argparse
+import json
 import os
 import shutil
 import stat
@@ -26,7 +27,12 @@ import subprocess
 import sys
 import urllib.request
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from app.provenance import capture_provenance
 
 
 def _rmtree_ro(path: Path) -> None:
@@ -121,6 +127,10 @@ def _build_embedded(repo_root: Path, dist_dir: Path, *, legacy: bool = False) ->
     _rmtree_ro(build_dir)
     build_dir.mkdir(parents=True)
 
+    # Capture build-time provenance before staging so the manifest reflects
+    # the source tree used for this build even after files are copied.
+    provenance = capture_provenance()
+
     embed_zip = downloads_dir / "python-embed.zip"
     get_pip = downloads_dir / "get-pip.py"
     _download(EMBED_URL, embed_zip)
@@ -173,7 +183,14 @@ def _build_embedded(repo_root: Path, dist_dir: Path, *, legacy: bool = False) ->
 
     # Stage application files.
     shutil.copytree(repo_root / "app", bundle_dir / "app")
-    shutil.copytree(repo_root / "config", bundle_dir / "config")
+    config_src = repo_root / "config"
+    config_dst = bundle_dir / "config"
+    config_dst.mkdir(parents=True)
+    for item in config_src.iterdir():
+        if item.is_file() and item.suffix == ".example":
+            shutil.copy2(item, config_dst / item.name)
+        elif item.is_dir():
+            shutil.copytree(item, config_dst / item.name)
     shutil.copy2(repo_root / "run_portable.py", bundle_dir / "run_portable.py")
     shutil.copy2(repo_root / requirements_file, bundle_dir / requirements_file)
     if legacy:
@@ -192,6 +209,17 @@ def _build_embedded(repo_root: Path, dist_dir: Path, *, legacy: bool = False) ->
         "& (Join-Path $scriptDir 'python\\python.exe') "
         "(Join-Path $scriptDir 'run_portable.py') @args\n",
         encoding="utf-8",
+    )
+
+    build_manifest = {
+        "commit_sha": provenance.get("head_commit_sha", "unknown"),
+        "dirty": provenance.get("dirty", "unknown"),
+        "build_timestamp": datetime.now(timezone.utc).isoformat(),
+        "patch_checksum": provenance.get("patch_checksum", ""),
+        "excluded_paths": provenance.get("excluded_paths", ""),
+    }
+    (bundle_dir / "build_manifest.json").write_text(
+        json.dumps(build_manifest, indent=2), encoding="utf-8"
     )
 
     dist_dir.mkdir(parents=True, exist_ok=True)

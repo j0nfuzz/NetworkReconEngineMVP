@@ -49,6 +49,42 @@ def _parse_lldp_neighbors(output: str, source_command: str) -> List[Dict[str, st
     if not output:
         return neighbors
 
+    def _field_value(entry: str, label: str) -> str:
+        for line in entry.splitlines():
+            stripped = line.strip()
+            if stripped.lower().startswith(label.lower()):
+                _, _, value = stripped.partition(":")
+                return value.strip()
+        return ""
+
+    if "neighbor chassis-id" in output.lower():
+        entries = re.split(r"\n(?=\s*Port\s*:\s*)", output, flags=re.IGNORECASE)
+        for entry in entries:
+            chassis_value = _field_value(entry, "Neighbor Chassis-ID")
+            if not chassis_value:
+                continue
+
+            system_value = _field_value(entry, "Neighbor System-Name")
+            mgmt_value = _field_value(entry, "Neighbor Management-Address")
+            identity = system_value or mgmt_value.split(",")[0].strip()
+            if not identity:
+                identity = chassis_value
+
+            neighbor: Dict[str, str] = {
+                "neighbor": identity,
+                "source": source_command,
+            }
+            if mgmt_value:
+                candidate = mgmt_value.split(",")[0].strip()
+                if re.match(r"\d{1,3}(\.\d{1,3}){3}", candidate):
+                    neighbor["ip"] = candidate
+            if not neighbor.get("ip") and re.match(r"\d{1,3}(\.\d{1,3}){3}", chassis_value):
+                neighbor["ip"] = chassis_value
+            if not neighbor.get("ip"):
+                neighbor["platform"] = chassis_value
+            neighbors.append(neighbor)
+        return neighbors
+
     entries = re.split(r"\n(?=\s*Chassis id:\s*)", output, flags=re.IGNORECASE)
     for entry in entries:
         chassis_match = re.search(r"Chassis id:\s*(.+)", entry, re.IGNORECASE)
