@@ -4108,3 +4108,29 @@ Risks Resolved:
 
 Next Recommended Action:
 - Run Terra/GPT review of PHASE-072 and PHASE-073 together; if approved, produce a fresh portable build and re-run field validation.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-074-FieldValidationBuildRefresh-072073Checkpoint
+
+Changes:
+- Generated a fresh portable build from clean HEAD `7d51832` using `python build_portable.py`.
+- Verified `dist/NetworkReconEngine.zip` `build_manifest.json` reports `commit_sha` matching build HEAD and `dirty:false`.
+- Verified configuration hygiene: only `devices.yml.example` and `interactive_devices.yml.example` present; no real `.yml` configs or credential-bearing files packaged.
+- Verified `Start_NetworkRecon.ps1 --help` and `Start_NetworkRecon.cmd --help` execute successfully in an extracted bundle.
+- Created `docs/Phases/PHASE-074-FieldValidationBuildRefresh-072073Checkpoint.md` and `docs/Phases/IMPLEMENTED-PHASE-074-FieldValidationBuildRefresh-072073Checkpoint.md`.
+
+Reason:
+- PHASE-072/073 remediations need a clean, traceable build for the next field-validation run; PHASE-074 refreshes the portable bundle provenance after those closures.
+
+Risks Introduced:
+- None (build/provenance activity only).
+
+Risks Resolved:
+- Removes the risk of testing PHASE-072/073 fixes against a stale or dirty build.
+
+Next Recommended Action:
+- Deploy `dist/NetworkReconEngine.zip` for field validation; if traversal and progress logging behave as expected, close PHASE-074 and open the next field-evidence review.
