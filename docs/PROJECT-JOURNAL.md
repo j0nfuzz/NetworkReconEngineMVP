@@ -4158,3 +4158,29 @@ Risks Resolved:
 
 Next Recommended Action:
 - Execute PHASE-075-FieldValidationPost072073 using the PHASE-074 build.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: PHASE-075-FieldValidationPost072073 (review outcome)
+
+Changes:
+- Terra REJECTED PHASE-075 findings (not a remediation phase itself; findings apply to production behavior).
+- Confirmed PHASE-072/073 both work in the field: HOSTNAME-06 classified aruba, queued, and attempted; unsupported Ubiquiti/Netgear neighbors correctly skipped; traversal stopping after HOSTNAME-06's auth failure is correct, not premature.
+- Root-caused the `build_provenance.json` `head_commit_sha: unknown` defect: `app/provenance.py::get_head_commit_sha()` shells out to `git rev-parse HEAD` at runtime, but portable extracted deployments ship no `.git` directory, so every field-collected device bundle from a portable build loses provenance traceability even though `build_manifest.json` captured the correct commit at build time.
+- Determined recursive-path artefact/console buffering (deferred writes/logging until `run_recursive_collection()` returns) is a distinct, already-diagnosed observability gap, not a new defect.
+- Created docs/Phases/PHASE-076-PortableBuildProvenancePropagation.md to fix the higher-value defect: propagate build-time provenance into runtime bundles instead of re-invoking git in the field.
+
+Reason:
+- Broken per-device provenance affects every field bundle produced by portable builds (the primary distribution path), directly undermining PROJECT-STANDARD.md principle 8 (raw evidence must always be retained) and DD-008 traceability; this is higher-value than the recursive-mode live-observability improvement, which is a UX gap on already-trustworthy data.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- Distinguishes the provenance-propagation defect from the recursive-observability gap, preventing scope conflation in remediation.
+
+Next Recommended Action:
+- Implement PHASE-076-PortableBuildProvenancePropagation; reconsider a recursive-mode live-streaming phase afterward if still valued.
