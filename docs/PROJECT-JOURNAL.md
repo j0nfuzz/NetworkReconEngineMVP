@@ -4033,3 +4033,27 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-072; separately consider a console-progress-visibility phase for recursive mode if still valued after PHASE-072 closes.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: PHASE-073-RecursiveCollectionPerDeviceProgressLogging
+
+Changes:
+- Identified that PHASE-062 (closed) only surfaced probe errors for unreachable devices; it did not add per-device start/progress logging to the default recursive path (_run_recursive_cli), unlike the existing sequential path.
+- Determined this is the exact console-silence gap observed in PHASE-071 field evidence, and that it is independent of PHASE-072 (different files: app/cli.py vs app/discovery.py).
+- Created docs/Phases/PHASE-073-RecursiveCollectionPerDeviceProgressLogging.md as a concurrent, non-overlapping workstream alongside PHASE-072.
+
+Reason:
+- PHASE-071 evidence showed no meaningful verbose progress during a successful recursive run; PHASE-062 does not cover this case (device was reachable, not unreachable), so a distinct, scoped phase is needed.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- Clarifies that console-progress-visibility is a distinct, already-actionable phase rather than an open question.
+
+Next Recommended Action:
+- Implement PHASE-072 and PHASE-073 concurrently; both are independent and file-disjoint.
