@@ -4263,3 +4263,27 @@ Risks Resolved:
 
 Next Recommended Action:
 - Build a fresh portable bundle from clean HEAD, then run Terra/GPT review of PHASE-076/077 before field validation.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: PHASE-076/077 (Terra rejection triage)
+
+Changes:
+- Terra REJECTED PHASE-076/077: (1) `RUNTIME_PROVENANCE_PATH` in app/provenance.py resolves under the embedded `python/` subdirectory, but build_portable.py writes `build_runtime_provenance.json` at the bundle root, so the portable provenance fallback never locates the file; (2) `--target-device` scoped/parallel collection (`run_parallel_scoped_collection`) never received the PHASE-077 streaming callback, so it still buffers artefacts until the run completes; (3) the final "Generated bundle manifest" console line bypasses `console.log` capture.
+- Confirmed traversal, classification, queueing, and sequential recursive streaming remain correct (not in question).
+- Created docs/Phases/PHASE-076A-PortableRuntimeProvenancePathFix.md (app/provenance.py only, path-fix scope) and docs/Phases/PHASE-077A-ScopedStreamingAndConsoleCaptureCompletion.md (app/cli.py only, scoped-path streaming + final-message capture) using the project's A/B remediation lineage convention.
+
+Reason:
+- Both defects are small, independently scoped, and file-disjoint (provenance.py vs cli.py), so they can be remediated concurrently without cross-phase risk; splitting by root cause avoids reopening the already-correct PHASE-076/077 work.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- Clarifies exact remediation scope so the Implementer does not re-touch already-correct sequential recursive streaming or orchestrator logic.
+
+Next Recommended Action:
+- Implement PHASE-077A (higher MVP priority: closes the remaining live-observability gap for scoped runs) and PHASE-076A concurrently; both are file-disjoint.
