@@ -33,3 +33,12 @@ OUTSTANDING RISKS:
 
 OPEN QUESTIONS:
 - None.
+
+---
+
+ARCHITECT AMENDMENT (environmental blocker, 2026-09-06):
+
+- Blocker evidence: the canonical dist/NetworkReconEngine.zip (PHASE-082 build) is held by an exclusive lock. Restart Manager attribution identifies the holding process as ScreenConnect Client, PID 22664 (RmMainWindow). The RMM client is a live remote-access process and MUST NOT be terminated. Retry loops totalling >4 minutes did not release the handle.
+- Amendment (PHASE-021 contract-amendment precedent): the PHASE-085 build is produced by build_portable.py from a pristine git worktree checkout of HEAD 462bf43 (tree CLEAN verified in situ), validated to the same acceptance criteria, and placed at dist/NetworkReconEngine-PHASE-085.zip. Provenance semantics are unchanged: manifest and runtime provenance both record commit 462bf43, dirty false.
+- HAZARD CONTROL: dist/ temporarily contains TWO archives. dist/NetworkReconEngine.zip is the OLDER PHASE-082 build (commit c290677) and MUST NOT be deployed for PHASE-086. Field deployment must use dist/NetworkReconEngine-PHASE-085.zip verified against SHA-256 776B2527A1840C301EBB3074741EC1509FF2E50C138255365EE9F852E16BFC30.
+- Follow-up action: when the ScreenConnect handle releases, replace the canonical name with the PHASE-085 artefact (or rebuild identically) and delete the amended-name duplicate so exactly one archive remains. This is a housekeeping action, not a new feature phase.

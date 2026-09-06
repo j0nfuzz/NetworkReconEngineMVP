@@ -4675,3 +4675,54 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-085; Terra review; on approval, execute PHASE-086 at the next field access window.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-085-FieldValidationBuildRefresh-084Checkpoint
+
+Changes:
+- Canonical dist artefact found exclusively locked; Restart Manager attributed the handle to ScreenConnect Client PID 22664; recorded the environmental blocker; Architect amendment appended to PHASE-085.
+- Built dist/NetworkReconEngine-PHASE-085.zip from a pristine git worktree at HEAD 462bf43 (in-situ clean verified) using the unmodified default embedded-runtime build; worktree removed afterwards.
+- Verified: manifest and runtime provenance both record 462bf43 with dirty false; archive 29,408,886 bytes, SHA-256 776B2527A1840C301EBB3074741EC1509FF2E50C138255365EE9F852E16BFC30; example-only config; both launchers; PHASE-084 gate and aruba-cx profile present in packaged source.
+- Full suite before and after build (main repo, HEAD unchanged): 346 passed, 1 pre-existing warning.
+- Created IMPLEMENTED-PHASE-085 record including the two-archive deployment-confusion hazard control and the canonical-name replacement follow-up.
+
+Reason:
+- PHASE-084 behaviour is field-observable only in a packaged run; the environmental lock could not be cleared safely, so the build used the pristine-worktree equivalence path per the Architect amendment (PHASE-021 precedent).
+
+Risks Introduced:
+- Two archives temporarily coexist in dist/ (hazard documented; SHA-gated deployment instruction recorded).
+
+Risks Resolved:
+- Field-attributable PHASE-084 build now exists.
+
+Next Recommended Action:
+- Terra review; on approval commit, then execute PHASE-086 with SHA-verified deployment; replace the canonical dist name when the lock releases.
+
+---
+
+Date: 2026-09-06
+Agent: GPT Reviewer
+
+Phase: PHASE-085-FieldValidationBuildRefresh-084Checkpoint
+
+Changes:
+- Independently re-extracted, re-hashed (776B2527...FC30), re-verified manifest/runtime-provenance agreement at 462bf43 with dirty false, config hygiene, packaged PHASE-084 gate and aruba-cx/fortigate profiles, launcher behaviour, and re-ran the full suite (346 passed).
+- Assessed and accepted the environmental-blocker amendment (ScreenConnect PID 22664 handle; live RMM client not terminable; pristine-worktree build preserving all acceptance-relevant properties; PHASE-021 amendment precedent).
+- Assessed the two-archive hazard as documented and controlled, with a mandatory SHA-256 deployment gate for PHASE-086; must not persist beyond the next housekeeping opportunity.
+- Created docs/Phases/REVIEW-PHASE-085-FieldValidationBuildRefresh-084Checkpoint.md: Approved, stable checkpoint, PUSH RECOMMENDED; PHASE-086 field-validation READY against the amended-name artefact.
+
+Reason:
+- All acceptance criteria met under the recorded amendment with reviewer-reproduced evidence.
+
+Risks Introduced:
+- None beyond the recorded, controlled archive-coexistence hazard.
+
+Risks Resolved:
+- The 084 checkpoint is packaged, review-approved, and SHA-identified for field deployment.
+
+Next Recommended Action:
+- Commit and push per recorded commands; execute PHASE-086 at the next field access window; replace the canonical dist artefact when the ScreenConnect lock releases.
