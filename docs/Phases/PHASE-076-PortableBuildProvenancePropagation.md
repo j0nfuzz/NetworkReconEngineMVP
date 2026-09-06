@@ -1,3 +1,5 @@
+STATUS: DEFERRED (superseded in priority by PHASE-077; see PROJECT-JOURNAL 2026-09-06 reassessment). Provenance remains traceable via build_manifest.json/build lineage in the interim. Not implemented; may be picked up after PHASE-077.
+
 PHASE:
 PHASE-076-PortableBuildProvenancePropagation
 

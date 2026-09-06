@@ -4184,3 +4184,29 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-076-PortableBuildProvenancePropagation; reconsider a recursive-mode live-streaming phase afterward if still valued.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: PHASE-076-PortableBuildProvenancePropagation (priority reassessment)
+
+Changes:
+- Reassessed PHASE-076 against MVP value (point NRE at one device → receive a useful troubleshooting package) rather than technical correctness alone.
+- FT060920261842 field evidence now proves discovery, classification, queueing, traversal, and recursion all work correctly; the remaining blocking MVP gaps are operational visibility, not provenance: no live console output, no live artefact writes, and no automatic console-to-output capture, matching Terra's PHASE-075 findings.
+- Determined provenance (`head_commit_sha: unknown` in portable field bundles) remains traceable in practice via `build_manifest.json`, portable build lineage, and committed phase artefacts, so it does not block operator or troubleshooting value today.
+- Deferred PHASE-076 (marked STATUS: DEFERRED in its phase file); it is not deleted and may resume once observability is fixed.
+- Created docs/Phases/PHASE-077-RecursiveLiveArtefactAndConsoleStreaming.md to stream per-device bundle writes and verbose logging live during recursive traversal instead of batching them until the run returns.
+
+Reason:
+- Live per-device observability directly blocks the MVP loop today (operators see nothing until the whole run ends, and interrupted runs lose all artefacts); provenance is a data-quality defect on already-successful collections, not a blocker to obtaining a useful troubleshooting package.
+
+Risks Introduced:
+- None (definition/reprioritization only).
+
+Risks Resolved:
+- Prevents further engineering investment in a lower-value fix (PHASE-076) ahead of the defect actually blocking MVP usability.
+
+Next Recommended Action:
+- Implement PHASE-077-RecursiveLiveArtefactAndConsoleStreaming.
