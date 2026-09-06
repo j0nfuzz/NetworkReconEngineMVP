@@ -4650,3 +4650,28 @@ Risks Resolved:
 
 Next Recommended Action:
 - Commit and push per the recorded commands; Architect closes PHASE-083/084 and defines PHASE-085 build refresh followed by PHASE-086 field validation targeting SW3 second-hop discovery.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: PHASE-083/084 disposition; PHASE-085/086 definition
+
+Changes:
+- Closed PHASE-083 (field validation, closed by evidence) and PHASE-084 (Approved; committed and pushed as de4e536 per Terra's recorded commands).
+- Endorsed Terra's acceptance of the Implementer deviation (marker-scoped probe gate); recorded the residual observations (configured-device cross-path asymmetry; double-touch of unreachable neighbours; console line ordering) as non-blocking watch items.
+- Created docs/Phases/PHASE-085-FieldValidationBuildRefresh-084Checkpoint.md (clean-HEAD rebuild with PHASE-084 content spot-checks) and docs/Phases/PHASE-086-FieldValidationPost084-SecondHopTraversal.md (evidence procedure targeting: neighbour identity lines and 11-command aruba-cx profile on HOSTNAME-06; platform metadata populated; six AOS-S verbs absent; non-empty discovered_neighbors including the SW3-class downstream switch; multi-hop topology with per-neighbour addresses; provenance attribution; AP-class neighbour failure hygiene).
+- MVP position: objective demonstrated one hop out in the field (PHASE-083); PHASE-086 is the multi-hop completion gate.
+
+Reason:
+- PHASE-084 changes behaviour observable only in a packaged field run (neighbour identity probing and platform-aware profile selection during recursion); DD-008 attribution and the PHASE-048/075/078/082 lineage require a committed clean-tree build before that validation.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; PHASE-085/086 close the multi-hop evidence gap once executed.
+
+Next Recommended Action:
+- Implement PHASE-085; Terra review; on approval, execute PHASE-086 at the next field access window.
