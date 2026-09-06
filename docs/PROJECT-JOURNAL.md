@@ -4317,3 +4317,28 @@ Risks Resolved:
 
 Next Recommended Action:
 - Run Terra/GPT review of the remediated implementation and, if accepted, rebuild a fresh portable bundle from clean HEAD for field validation.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: PHASE-076A / PHASE-077A closure; PHASE-078 selection
+
+Changes:
+- Closed PHASE-076A and PHASE-077A: Terra verdict APPROVED, no critical issues, no major issues; 334 tests passing with 1 existing warning; extracted portable runtime resolves bundle-root provenance and returns the embedded commit SHA; scoped collection streams artefacts live; final manifest message captured in console.log; traversal, classification, queueing, and sequential recursive behaviour confirmed unchanged.
+- Determined no further remediation is required: Terra recorded no open defects; the remaining recorded risks (static embedded provenance; per-device aggregate artefact writes) are accepted existing behaviour.
+- Selected FieldValidationBuildRefresh-076A077ACheckpoint as the single highest-value next phase and created docs/Phases/PHASE-078-FieldValidationBuildRefresh-076A077ACheckpoint.md.
+- Recorded that the post-refresh field validation phase (PHASE-079) is the direct follow-on and will be defined only after PHASE-078's build evidence exists, because its acceptance criteria depend on PHASE-078's recorded build manifest, archive hash, and HEAD SHA (PHASE-074/075 lineage).
+
+Reason:
+- PHASE-076A and PHASE-077A both change behaviour that manifests only in an extracted portable run (runtime provenance resolution; console capture and scoped streaming); DD-008 attribution and the PHASE-048 precedent require a committed, clean-tree, attributable build before any field collection is performed against it. A build refresh is the mechanical prerequisite, and field validation without it would repeat the provenance-gap failure mode that PHASE-075's rejection exposed.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; PHASE-078 closes the build-attribution gap for the 076A/077A checkpoint once its evidence is recorded.
+
+Next Recommended Action:
+- Implement PHASE-078-FieldValidationBuildRefresh-076A077ACheckpoint (clean HEAD, full suite, rebuild dist, record build evidence), then define PHASE-079 field validation against the PHASE-078 build.
