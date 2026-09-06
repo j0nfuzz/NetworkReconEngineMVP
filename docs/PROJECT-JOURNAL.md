@@ -4342,3 +4342,57 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-078-FieldValidationBuildRefresh-076A077ACheckpoint (clean HEAD, full suite, rebuild dist, record build evidence), then define PHASE-079 field validation against the PHASE-078 build.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-078-FieldValidationBuildRefresh-076A077ACheckpoint
+
+Changes:
+- Committed the PHASE-076A/077A closure artefacts (1bcd549) so the build started from a clean HEAD.
+- Verified full regression suite before the build: 334 passed, 1 pre-existing warning.
+- Rebuilt dist/NetworkReconEngine.zip from clean HEAD 1bcd549dd5af244487d2de7785c1ca02ade3ede7 using the default embedded-runtime mode (no --pyinstaller, no --legacy); prior dist replaced.
+- Recorded build evidence: build_manifest.json (commit_sha matches HEAD, dirty:false), build_runtime_provenance.json at bundle root (head_commit_sha matches manifest), archive 29,502,539 bytes, SHA-256 A62DBF8BB5CBF7EFE5170EC8FC8E63D12B7D4B01D5C00272FBF547DE45C5F94E.
+- Verified config hygiene in the extracted archive: only devices.yml.example and interactive_devices.yml.example; no real config YAML.
+- Validated Start_NetworkRecon.ps1 --help and Start_NetworkRecon.cmd --help from the extracted bundle; usage output includes --recursive, --no-recurse, --target-device, --scope-depth, --max-concurrent, --verbose.
+- Re-ran full regression suite after the build: 334 passed, 1 pre-existing warning.
+- Created docs/Phases/IMPLEMENTED-PHASE-078-FieldValidationBuildRefresh-076A077ACheckpoint.md.
+
+Reason:
+- PHASE-076A and PHASE-077A manifest only in an extracted portable run; DD-008 attribution and the PHASE-075 rejection require a committed, clean-tree, attributable build before field collection.
+
+Risks Introduced:
+- None (no production or test code changed; static embedded provenance staleness remains the accepted documented risk).
+
+Risks Resolved:
+- A field-attributable build now exists for the 076A/077A checkpoint; the PHASE-048/075 provenance-gap failure mode cannot recur for the next field run.
+
+Next Recommended Action:
+- GPT/Terra review of PHASE-078; on approval, commit the closure artefacts and define PHASE-079 field validation against this build.
+
+---
+
+Date: 2026-09-06
+Agent: GPT Reviewer
+
+Phase: PHASE-078-FieldValidationBuildRefresh-076A077ACheckpoint
+
+Changes:
+- Independently re-extracted the dist archive from a separate path, re-derived HEAD, manifest SHA, runtime-provenance SHA, archive hash/size, config hygiene, and both launcher validations; re-ran the full suite (334 passed, 1 pre-existing warning).
+- Verified provenance consistency: build_manifest.json commit_sha, build_runtime_provenance.json head_commit_sha, and git HEAD all equal 1bcd549dd5af244487d2de7785c1ca02ade3ede7; dirty false with empty patch.
+- Verified scope: documentation artefacts only; no source or test changes.
+- Created docs/Phases/REVIEW-PHASE-078-FieldValidationBuildRefresh-076A077ACheckpoint.md with verdict Approved, stable checkpoint, and push recommendation.
+
+Reason:
+- All PHASE-078 acceptance criteria are met with reviewer-reproduced evidence; the resulting build is attributable per DD-008 and structurally excludes the PHASE-048/075 failure modes.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- An attributable field-validation build now exists for the 076A/077A checkpoint (archive SHA-256 A62DBF8BB5CBF7EFE5170EC8FC8E63D12B7D4B01D5C00272FBF547DE45C5F94E, 29,502,539 bytes).
+
+Next Recommended Action:
+- Commit and push the PHASE-078 artefacts per the review's recorded commands, then define PHASE-079 field validation against this build.
