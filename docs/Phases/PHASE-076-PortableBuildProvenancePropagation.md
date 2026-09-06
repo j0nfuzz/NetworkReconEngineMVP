@@ -1,4 +1,4 @@
-STATUS: DEFERRED (superseded in priority by PHASE-077; see PROJECT-JOURNAL 2026-09-06 reassessment). Provenance remains traceable via build_manifest.json/build lineage in the interim. Not implemented; may be picked up after PHASE-077.
+STATUS: ACTIVE (concurrent with PHASE-077; file-disjoint — touches app/provenance.py, build_portable.py, app/collector.py vs PHASE-077's app/cli.py, app/orchestrator.py). Reprioritized below PHASE-077 in value but safe to implement in parallel; see PROJECT-JOURNAL 2026-09-06.
 
 PHASE:
 PHASE-076-PortableBuildProvenancePropagation

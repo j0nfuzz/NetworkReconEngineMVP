@@ -4210,3 +4210,27 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-077-RecursiveLiveArtefactAndConsoleStreaming.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: PHASE-076/PHASE-077 (concurrency reassessment)
+
+Changes:
+- Confirmed PHASE-076 (app/provenance.py, build_portable.py, app/collector.py) and PHASE-077 (app/cli.py, app/orchestrator.py) are file-disjoint and independently testable.
+- Re-activated PHASE-076 to run concurrently with PHASE-077 rather than deferred; both may proceed in parallel without cross-phase implementation risk.
+- Did not add further concurrent workstreams beyond these two; no other un-implemented, evidence-backed defect exists in current field evidence.
+
+Reason:
+- Maximum concurrency (5) is a ceiling, not a target; only genuinely independent, non-overlapping, evidence-justified work should run in parallel.
+
+Risks Introduced:
+- None (file-disjoint, no shared state).
+
+Risks Resolved:
+- None new; PHASE-076 remains lower-priority than PHASE-077 but is no longer blocked from proceeding in parallel.
+
+Next Recommended Action:
+- Implement PHASE-077-RecursiveLiveArtefactAndConsoleStreaming and PHASE-076-PortableBuildProvenancePropagation concurrently.
