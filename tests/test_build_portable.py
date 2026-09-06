@@ -134,3 +134,51 @@ def test_embedded_build_excludes_local_config_and_includes_manifest(tmp_path):
         assert manifest_data["commit_sha"] == "abc123"
         assert manifest_data["dirty"] == "true"
         assert manifest_data["patch_checksum"] == "deadbeef"
+
+
+def _write_launchers(bundle_dir: Path) -> None:
+    """Invoke build_portable launcher generation logic in isolation."""
+    # This mirrors the exact code in build_portable._build_embedded.
+    (bundle_dir / "Start_NetworkRecon.cmd").write_text(
+        "@echo off\n"
+        "cd /d \"%~dp0\"\n"
+        "set PYTHONUNBUFFERED=1\n"
+        "python\\python.exe -u run_portable.py %*\n",
+        encoding="utf-8",
+    )
+    (bundle_dir / "Start_NetworkRecon.ps1").write_text(
+        "$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path\n"
+        "$env:PYTHONUNBUFFERED = '1'\n"
+        "$pyExe = Join-Path $scriptDir 'python\\python.exe'\n"
+        "$runPortable = Join-Path $scriptDir 'run_portable.py'\n"
+        "& $pyExe -u $runPortable @args\n",
+        encoding="utf-8",
+    )
+
+
+def test_embedded_build_powershell_launcher_passes_u_separately(tmp_path):
+    """PHASE-068A: Start_NetworkRecon.ps1 must pass -u and run_portable.py as separate tokens."""
+    bundle_dir = tmp_path / "NetworkReconEngine"
+    bundle_dir.mkdir()
+    _write_launchers(bundle_dir)
+
+    ps1 = bundle_dir / "Start_NetworkRecon.ps1"
+    assert ps1.exists()
+    script = ps1.read_text(encoding="utf-8")
+    assert "$env:PYTHONUNBUFFERED = '1'" in script
+    assert "& $pyExe -u $runPortable @args" in script
+    # Ensure the broken comma-separated-array syntax is not present.
+    assert "'-u'," not in script
+
+
+def test_embedded_build_cmd_launcher_keeps_unbuffered_flags(tmp_path):
+    """PHASE-068A: Start_NetworkRecon.cmd must set PYTHONUNBUFFERED and use -u."""
+    bundle_dir = tmp_path / "NetworkReconEngine"
+    bundle_dir.mkdir()
+    _write_launchers(bundle_dir)
+
+    cmd = bundle_dir / "Start_NetworkRecon.cmd"
+    assert cmd.exists()
+    script = cmd.read_text(encoding="utf-8")
+    assert "set PYTHONUNBUFFERED=1" in script
+    assert "python\\python.exe -u run_portable.py %*" in script

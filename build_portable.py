@@ -201,13 +201,16 @@ def _build_embedded(repo_root: Path, dist_dir: Path, *, legacy: bool = False) ->
     (bundle_dir / "Start_NetworkRecon.cmd").write_text(
         "@echo off\n"
         "cd /d \"%~dp0\"\n"
-        "python\\python.exe run_portable.py %*\n",
+        "set PYTHONUNBUFFERED=1\n"
+        "python\\python.exe -u run_portable.py %*\n",
         encoding="utf-8",
     )
     (bundle_dir / "Start_NetworkRecon.ps1").write_text(
         "$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path\n"
-        "& (Join-Path $scriptDir 'python\\python.exe') "
-        "(Join-Path $scriptDir 'run_portable.py') @args\n",
+        "$env:PYTHONUNBUFFERED = '1'\n"
+        "$pyExe = Join-Path $scriptDir 'python\\python.exe'\n"
+        "$runPortable = Join-Path $scriptDir 'run_portable.py'\n"
+        "& $pyExe -u $runPortable @args\n",
         encoding="utf-8",
     )
 
