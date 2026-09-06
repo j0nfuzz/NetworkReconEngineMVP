@@ -4498,3 +4498,28 @@ Risks Resolved:
 
 Next Recommended Action:
 - Commit and push per the recorded commands; Architect to close the phases and define the PHASE-082 build refresh.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: PHASE-079/080/081/081A disposition; PHASE-082 selection
+
+Changes:
+- Closed PHASE-079 (field validation by evidence), PHASE-080, PHASE-081, PHASE-081A following Terra's Approved re-review and committed stable checkpoint 13433dc (pushed).
+- Recorded Architect adjudication of Terra's rejection of PHASE-081: agreed with the MAJOR finding (identity-resolved wording violated the PHASE-061A confidence-gate consistency criterion in the auto-to-generic degradation scenario); directed the PHASE-081A remediation, which Terra then approved.
+- Selected and created docs/Phases/PHASE-082-FieldValidationBuildRefresh-081ACheckpoint.md: portable build refresh from clean HEAD containing PHASE-080/081/081A, prerequisite for the next field run.
+- Next field validation objectives (for the PHASE-083 definition after PHASE-082 closes): HOSTNAME-06 branch re-attempt with propagated credentials; intra-device progress lines present in console.log during active collection; provenance attribution re-confirmed.
+
+Reason:
+- PHASE-080/081/081A change interactive-runtime and console-visibility behaviour that manifests only in an extracted portable run; DD-008 attribution and the PHASE-048/075/078 lineage require a committed clean-tree build before field collection.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; PHASE-082 produces the attributable field build for credential propagation and progress visibility validation.
+
+Next Recommended Action:
+- Implement PHASE-082 (clean HEAD, suite, rebuild dist, record evidence); Terra review; then define PHASE-083 field validation against the PHASE-082 build.
