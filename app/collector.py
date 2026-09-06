@@ -19,7 +19,11 @@ from app.troubleshooting import build_troubleshooting_bundle
 from app.vendor_profiles import get_vendor_commands, validate_device_command_set
 
 
-def execute_device_collection(device: Device, *, dry_run: bool = False) -> DeviceBundle:
+def execute_device_collection(device: Device, *, dry_run: bool = False, progress: Any = None) -> DeviceBundle:
+    def _progress(message: str) -> None:
+        if callable(progress):
+            progress(f"[verbose] {device.name}: {message}")
+
     summary: Dict[str, Any] = {
         "device": device.name,
         "hostname": device.hostname,
@@ -79,8 +83,10 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
         known_hosts=device.known_hosts,
     )
 
+    _progress("probing SSH reachability...")
     probe = ssh_client.probe()
     if not probe.get("reachable", False):
+        _progress(f"probe failed: {probe.get('error', 'SSH connection failed')}")
         summary["status"] = "unreachable"
         summary["error"] = probe.get("error", "SSH connection failed")
         return DeviceBundle(
@@ -92,6 +98,8 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
             failed_commands=commands,
         )
 
+    _progress("probe: reachable")
+    _progress("connecting...")
     try:
         connection = ssh_client.connect()
     except Exception as exc:
@@ -106,8 +114,10 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
             failed_commands=commands,
         )
 
+    total_commands = len(commands)
     try:
-        for command in commands:
+        for command_index, command in enumerate(commands, start=1):
+            _progress(f"({command_index}/{total_commands}) {command}")
             result = ssh_client.run_command(command, client=connection)
             if result.get("_recovered_client"):
                 recovered = result["_recovered_client"]

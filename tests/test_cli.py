@@ -3475,3 +3475,62 @@ def test_bundle_manifest_message_captured_in_console_log(monkeypatch, tmp_path):
     console = (tmp_path / "console.log").read_text(encoding="utf-8")
     assert "Generated bundle manifest" in console
 
+
+
+def test_prompt_interactive_inventory_writes_default_credentials_block(monkeypatch):
+    inputs = iter(["10.0.0.3", "admin", "", ""])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "<PASSWORD-01>")
+
+    runtime_path = _prompt_interactive_inventory()
+
+    try:
+        from app.config import load_default_credentials
+        defaults = load_default_credentials(runtime_path)
+        assert defaults == {"username": "admin", "password": "<PASSWORD-01>"}
+    finally:
+        runtime_path.unlink(missing_ok=True)
+
+
+def test_recursive_cli_passes_on_progress_to_sequential_run(monkeypatch, tmp_path, capsys):
+    import argparse
+    import app.cli as cli_module
+    from app.models import Device
+
+    captured_kwargs = {}
+
+    def fake_run(seed_device, default_credentials=None, **kwargs):
+        captured_kwargs.update(kwargs)
+        return {"bundles": {}, "probe_errors": {}}
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run)
+    monkeypatch.setattr("app.cli.load_default_credentials", lambda path: {})
+
+    args = argparse.Namespace(
+        config=None,
+        output_dir=str(tmp_path),
+        dry_run=False,
+        verbose=True,
+        probe=False,
+        recursive=False,
+        no_recurse=False,
+        checkpoint_file=None,
+        target_device=None,
+        scope_depth=1,
+        max_concurrent=5,
+    )
+    device = Device(
+        name="seed",
+        hostname="192.0.2.10",
+        vendor="auto",
+        username="admin",
+        password="<PASSWORD-01>",
+    )
+
+    exit_code = cli_module._run_cli_collection(args, [device], "", tmp_path, verbose=True)
+
+    assert exit_code == 0
+    on_progress = captured_kwargs.get("on_progress")
+    assert callable(on_progress)
+    on_progress("[verbose] seed: (1/1) show version")
+    assert "[verbose] seed: (1/1) show version" in capsys.readouterr().out

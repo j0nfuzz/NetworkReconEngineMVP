@@ -104,6 +104,7 @@ def run_recursive_collection(
     on_device_collected: Any = None,
     resume_state: Optional[Dict[str, Any]] = None,
     allowed_devices: Optional[set[str]] = None,
+    on_progress: Any = None,
 ) -> Dict[str, Any]:
     """Collect from a seed device, then recursively collect from supported neighbors.
 
@@ -141,11 +142,23 @@ def run_recursive_collection(
         visited.add(device.name)
 
         if device.vendor in ("auto", "unknown"):
+            if callable(on_progress):
+                on_progress(f"[verbose] {device.name}: probing identity...")
             probe_error = _probe_identity(device)
             if probe_error:
                 probe_errors[device.name] = probe_error
+                if callable(on_progress):
+                    on_progress(f"[verbose] {device.name}: identity probe failed: {probe_error}")
+            elif callable(on_progress):
+                if _existing_identity_confidence(device) > 0 or device.vendor not in ("auto", "unknown"):
+                    on_progress(f"[verbose] {device.name}: identity resolved: vendor={device.vendor}")
+                else:
+                    on_progress(f"[verbose] {device.name}: identity probe: no confident match; retaining vendor={device.vendor}")
 
-        bundle = execute_device_collection(device)
+        if callable(on_progress):
+            bundle = execute_device_collection(device, progress=on_progress)
+        else:
+            bundle = execute_device_collection(device)
         bundles[device.name] = bundle
 
         def _emit_checkpoint() -> None:

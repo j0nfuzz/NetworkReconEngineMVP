@@ -53,7 +53,7 @@ You will be prompted for:
 - SSH port (defaults to `22`)
 - Vendor (defaults to `auto`)
 
-The CLI writes the entered details to a temporary runtime YAML in the system temp directory, then runs the normal collection path and deletes the file. Existing `--config` workflows are unchanged.
+The CLI writes the entered details to a temporary runtime YAML in the system temp directory, then runs the normal collection path and deletes the file. The prompted credentials are also written to the runtime inventory's `default:` block, so during recursive collection discovered neighbours reuse them instead of receiving empty credentials. Existing `--config` workflows are unchanged; config-file users should set a `default:` credentials block for recursive runs.
 
 The packaged executable supports the same prompt-based launch:
 

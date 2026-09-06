@@ -4396,3 +4396,105 @@ Risks Resolved:
 
 Next Recommended Action:
 - Commit and push the PHASE-078 artefacts per the review's recorded commands, then define PHASE-079 field validation against this build.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: PHASE-079 field validation disposition; PHASE-080/081 selection
+
+Changes:
+- Dispositioned the FT060920261933 field run (2026-09-06T18:28:50Z against the PHASE-078 build, provenance 1bcd549 verified in both device bundles) as PHASE-079 executed-and-closed-by-evidence; created docs/FieldEvidence/PHASE-079-20260906-182850-fieldvalidation-findings.md and docs/Phases/PHASE-079-FieldValidationPost076A077A.md.
+- Recorded proven capabilities: portable provenance attribution, discovery, classification (6 neighbours; 5 with distinct IPs), queueing, traversal, recursion, live streaming, console capture, packaging. No reopening of any of these per standing direction and evidence.
+- Root-caused DEFECT 2: the interactive runtime YAML carries no default credentials block, so load_default_credentials() returns empty and neighbour devices are constructed with empty credentials (HOSTNAME-06 Authentication failed., 0 commands). Classification: implementation defect; credentials NOT PROPAGATED on the default field journey.
+- Root-caused DEFECT 1: console.log holds per-device lines only; no intra-device progress across probe, identity probe, connect, and command execution. Classification: implementation gap; PHASE-073 scoped to per-device granularity.
+- MVP decision: candidate A (automatic propagation via the existing default-credentials mechanism) selected; candidate B (mid-run interactive prompting) rejected for MVP; candidate C noted as already embodied by the default block once populated.
+- Created docs/Phases/PHASE-080-InteractiveDefaultCredentialPropagation.md (app/cli.py, README.md, tests/test_cli.py) and docs/Phases/PHASE-081-RecursiveIntraDeviceProgressLogging.md (collector/orchestrator/cli + tests) as the two permitted concurrent workstreams; files ordered for sequential implementation because both touch app/cli.py.
+
+Reason:
+- Both defects are directly evidenced by the FT060920261933 bundle; PHASE-080 unblocks the HOSTNAME-06 branch (the first multi-device traversal completion), and PHASE-081 removes the remaining operator-silence gaps during long waits. Both are minimal, additive, and leave all proven subsystems untouched.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; PHASE-080/081 close the two evidence-backed defects once implemented.
+
+Next Recommended Action:
+- Kimi implements PHASE-080 then PHASE-081 sequentially (shared file app/cli.py); Terra reviews both plus the PHASE-079 closure in one review cycle; then a build-refresh phase before the next field run.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-080-InteractiveDefaultCredentialPropagation / PHASE-081-RecursiveIntraDeviceProgressLogging
+
+Changes:
+- PHASE-080: app/cli.py interactive payload now includes a default credentials block (prompted username/password), so load_default_credentials() feeds the orchestrators and discovered neighbours receive real credentials; README documents the behaviour for interactive and config-file journeys; new round-trip regression test added.
+- PHASE-081: execute_device_collection() gained an optional progress callback emitting probe/connect/(i/N) command lines; run_recursive_collection() gained optional on_progress with identity-phase lines and conditional forwarding that preserves existing caller contracts; app/cli.py sequential recursive path wires on_progress into log_verbose (console.log capture unchanged).
+- New tests: tests/test_collector.py (4), tests/test_orchestrator.py (2), tests/test_cli.py (2). Full suite: 342 passed, 1 pre-existing warning.
+- Created IMPLEMENTED-PHASE-079/080/081 records; PHASE-079 closed by field evidence (FT060920261933).
+
+Reason:
+- Both defects were proven by the FT060920261933 bundle: empty propagated credentials killed the HOSTNAME-06 branch, and console.log showed zero intra-device feedback between per-device lines.
+
+Risks Introduced:
+- Neighbours now receive real credentials on the interactive journey (bounded by scope/max_devices).
+- Additional verbose console volume during collection.
+
+Risks Resolved:
+- Neighbour credential starvation on interactive recursive runs.
+- Operator-silence gaps during probe/connect/command waits on the sequential recursive path.
+
+Next Recommended Action:
+- Terra review of PHASE-079 closure plus PHASE-080/081 implementations; on approval, commit, run a build refresh, then field re-validation targeting the HOSTNAME-06 branch.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-081A-IdentityProbeProgressAccuracyRemediation
+
+Changes:
+- app/orchestrator.py: confidence-gated the identity progress lines; resolved wording now requires positive identity confidence or a concrete vendor; otherwise emits "identity probe: no confident match; retaining vendor=<vendor>".
+- tests/test_orchestrator.py: unresolved-wording and resolved-wording regressions; previously misleading assertion inverted.
+- Full suite: 343 passed, 1 pre-existing warning.
+- Created IMPLEMENTED-PHASE-081A record.
+
+Reason:
+- Remediate the Terra MAJOR finding: "identity resolved: vendor=auto" misrepresented unresolved detection in the safety-critical auto-to-generic scenario.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Misleading identity progress wording.
+
+Next Recommended Action:
+- Terra re-review; on approval commit the 079-081A tree and proceed to PHASE-082 build refresh.
+
+---
+
+Date: 2026-09-06
+Agent: GPT Reviewer
+
+Phase: PHASE-081A-IdentityProbeProgressAccuracyRemediation
+
+Changes:
+- Independently verified the confidence-gated wording fix, both pinned test branches, suite reproduction (343 passed), and diff confinement to app/orchestrator.py and tests/test_orchestrator.py.
+- Created docs/Phases/REVIEW-PHASE-081A-IdentityProbeProgressAccuracyRemediation.md: Approved, stable checkpoint, PUSH RECOMMENDED with explicit file list and commit message.
+
+Reason:
+- The MAJOR issue from REVIEW-PHASE-079-080-081 is remediated as prescribed with reviewer-reproduced evidence; no new issues.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- PHASE-081 acceptance criterion (identity lines consistent with PHASE-061A gating) now met; the combined 079-081A tree is push-ready.
+
+Next Recommended Action:
+- Commit and push per the recorded commands; Architect to close the phases and define the PHASE-082 build refresh.

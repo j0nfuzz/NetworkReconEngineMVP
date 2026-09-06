@@ -39,6 +39,10 @@ def _prompt_interactive_inventory() -> Path:
     name = hostname
 
     payload = {
+        "default": {
+            "username": username,
+            "password": password,
+        },
         "devices": [
             {
                 "name": name,
@@ -230,6 +234,7 @@ def _run_recursive_cli(
             on_collected=on_collected,
             on_device_collected=on_device_collected,
             allowed_devices=allowed_devices,
+            on_progress=log_verbose,
         )
         bundle_items = result["bundles"].items()
 

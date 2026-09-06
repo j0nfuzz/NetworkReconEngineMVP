@@ -442,3 +442,66 @@ def test_auto_vendor_synced_when_retaining_higher_confidence_identity(monkeypatc
     assert sw01.metadata["identity"]["vendor"] == "aruba"
     assert sw01.metadata["identity"]["confidence"] == 0.95
 
+
+
+def test_on_progress_forwarded_and_identity_lines_emitted(monkeypatch):
+    captured = []
+
+    def collector(device, progress=None):
+        if callable(progress):
+            progress(f"[verbose] {device.name}: (1/1) show version")
+        return _make_bundle(device.name, device.vendor, "collected", [])
+
+    monkeypatch.setattr("app.orchestrator.execute_device_collection", collector)
+    monkeypatch.setattr("app.orchestrator._probe_identity", lambda device: None)
+
+    seed = Device(name="seed", hostname="10.0.0.1", vendor="auto", username="u", password="<PASSWORD-06>")
+    result = run_recursive_collection(seed, on_progress=captured.append)
+
+    assert result["successful"] == ["seed"]
+    assert any("probing identity" in line for line in captured)
+    assert any("no confident match" in line for line in captured)
+    assert not any("identity resolved" in line for line in captured)
+    assert any("show version" in line for line in captured)
+
+
+def test_on_progress_reports_resolved_identity_when_probe_mutates_vendor(monkeypatch):
+    captured = []
+
+    def probing(device):
+        device.vendor = "aruba"
+        device.metadata["identity"] = {
+            "vendor": "aruba",
+            "platform": "arubaos-cx",
+            "model": "x",
+            "confidence": 0.6,
+        }
+        return None
+
+    def collector(device, progress=None):
+        return _make_bundle(device.name, device.vendor, "collected", [])
+
+    monkeypatch.setattr("app.orchestrator.execute_device_collection", collector)
+    monkeypatch.setattr("app.orchestrator._probe_identity", probing)
+
+    seed = Device(name="seed", hostname="10.0.0.1", vendor="auto", username="u", password="<PASSWORD-06>")
+    result = run_recursive_collection(seed, on_progress=captured.append)
+
+    assert result["successful"] == ["seed"]
+    assert any("identity resolved: vendor=aruba" in line for line in captured)
+    assert not any("no confident match" in line for line in captured)
+
+
+def test_no_on_progress_keeps_caller_contract(monkeypatch):
+    collector_calls = []
+
+    def collector(device):
+        collector_calls.append(device.name)
+        return _make_bundle(device.name, device.vendor, "collected", [])
+
+    monkeypatch.setattr("app.orchestrator.execute_device_collection", collector)
+    seed = Device(name="seed", hostname="10.0.0.1", vendor="cisco", username="u", password="<PASSWORD-06>")
+    result = run_recursive_collection(seed)
+
+    assert result["successful"] == ["seed"]
+    assert collector_calls == ["seed"]
