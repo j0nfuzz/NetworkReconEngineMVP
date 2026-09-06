@@ -3802,3 +3802,56 @@ Risks Resolved:
 
 Next Recommended Action:
 - Run Terra/GPT review of PHASE-064; if approved, commit the phase artefacts and hand off to ArubaOSCXLLDPFieldValidation using dist/NetworkReconEngine.zip.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: ArubaOSCXLLDPFieldValidation second field bundle disposition
+
+Changes:
+- Reviewed FT060920260035.zip (console.txt, bundle_manifest.json, topology.json, raw LLDP output) against four reported findings.
+- Confirmed Finding 1 (verbose output batched at completion): code inspection shows no unbuffered stdout mode (-u/PYTHONUNBUFFERED/flush) in run_portable.py or the generated launcher scripts, consistent with the observed batching under a redirected console.
+- Confirmed Finding 2 (neighbour address identity loss): app/topology.py::build_topology_graph() discards the "ip" field from discovered_neighbors entirely; neighbours exist only as name-string edge targets with zero address retention, even though bundle_manifest.json correctly records distinct per-neighbour IPs.
+- Confirmed Finding 3 (MAC-address neighbour identifier) is app/discovery.py's existing, documented chassis-ID fallback behaving as designed; genuineness of the underlying LLDP entry cannot be determined from this evidence alone.
+- Finding 4 (zip filename truncation) unchanged; already scoped as PHASE-066.
+- Marked PHASE-065 SUPERSEDED / NON-AUTHORITATIVE per the PHASE-048 precedent (retained, not deleted): its premise (platform-extraction-only) is subsumed by the more fundamental address-identity and identifier-validity defects.
+- Defined PHASE-067-NeighbourAddressIdentityTopologyRemediation (Finding 2), PHASE-068-VerboseConsoleOutputBufferingRemediation (Finding 1), PHASE-069-MACAddressNeighbourIdentifierEvidenceReview (Finding 3, evidence-gated, no code change). PHASE-066 (Finding 4) retained unchanged.
+
+Reason:
+- Field evidence showed the original PHASE-065 remediation target (vendor classification) was not the blocking defect; topology address retention and console buffering are more fundamental and independently verifiable defects.
+
+Risks Introduced:
+- None (disposition and phase-definition only; no code changes).
+
+Risks Resolved:
+- Remediation plan now targets the evidence-confirmed root causes rather than a superseded hypothesis.
+
+Next Recommended Action:
+- Implement PHASE-067-NeighbourAddressIdentityTopologyRemediation (selected next implementation phase; see handover).
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-067-NeighbourAddressIdentityTopologyRemediation
+
+Changes:
+- Updated app/topology.py::build_topology_graph() to preserve each discovered neighbor's "ip" (when present) by adding an "ip" field to edges and a "neighbor_addresses" mapping on source nodes.
+- Kept the existing "neighbors" string list and edge source/target naming semantics unchanged for backward compatibility.
+- Added regression tests in tests/test_cli.py for IP retention, distinct IPs across multiple neighbors, and backward compatibility when no IP is present.
+- Created docs/Phases/IMPLEMENTED-PHASE-067-NeighbourAddressIdentityTopologyRemediation.md.
+
+Reason:
+- Field evidence FT060920260035 confirmed topology.json discarded neighbor management-address data that bundle_manifest.json correctly retained; PHASE-067 closes this data-retention defect in graph construction.
+
+Risks Introduced:
+- None expected; additive fields preserve existing consumers that ignore unknown keys.
+
+Risks Resolved:
+- topology.json no longer silently loses neighbor address identity surfaced during discovery.
+
+Next Recommended Action:
+- Run GPT review of PHASE-067; if approved, implement PHASE-068-VerboseConsoleOutputBufferingRemediation next.

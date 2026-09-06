@@ -17,6 +17,7 @@ def build_topology_graph(summaries: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             "vendor": summary.get("vendor", "unknown"),
             "role": summary.get("role", "unknown"),
             "neighbors": [],
+            "neighbor_addresses": {},
         }
 
     for summary in summaries:
@@ -28,6 +29,11 @@ def build_topology_graph(summaries: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             if not neighbor_name:
                 continue
             nodes[source]["neighbors"].append(neighbor_name)
-            edges.append({"source": source, "target": neighbor_name})
+            edge: Dict[str, str] = {"source": source, "target": neighbor_name}
+            neighbor_ip = neighbor_record.get("ip")
+            if neighbor_ip:
+                edge["ip"] = neighbor_ip
+                nodes[source]["neighbor_addresses"][neighbor_name] = neighbor_ip
+            edges.append(edge)
 
     return {"nodes": nodes, "edges": edges}

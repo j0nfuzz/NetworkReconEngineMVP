@@ -605,6 +605,61 @@ def test_build_topology_graph_empty_input():
     assert graph["edges"] == []
 
 
+def test_build_topology_graph_preserves_neighbor_ip():
+    summaries = [
+        {
+            "device": "SW01",
+            "vendor": "aruba",
+            "role": "switch",
+            "discovered_neighbors": [
+                {"neighbor": "SW02", "source": "show lldp neighbor-info detail", "ip": "192.168.2.10"},
+            ],
+        }
+    ]
+    graph = build_topology_graph(summaries)
+    assert graph["nodes"]["SW01"]["neighbors"] == ["SW02"]
+    assert graph["nodes"]["SW01"]["neighbor_addresses"] == {"SW02": "192.168.2.10"}
+    assert graph["edges"] == [{"source": "SW01", "target": "SW02", "ip": "192.168.2.10"}]
+
+
+def test_build_topology_graph_multiple_neighbors_keep_distinct_ips():
+    summaries = [
+        {
+            "device": "SW01",
+            "vendor": "aruba",
+            "role": "switch",
+            "discovered_neighbors": [
+                {"neighbor": "SW02", "source": "show lldp neighbor-info detail", "ip": "192.168.2.10"},
+                {"neighbor": "SW03", "source": "show lldp neighbor-info detail", "ip": "192.168.2.11"},
+            ],
+        }
+    ]
+    graph = build_topology_graph(summaries)
+    assert graph["nodes"]["SW01"]["neighbor_addresses"] == {
+        "SW02": "192.168.2.10",
+        "SW03": "192.168.2.11",
+    }
+    edge_targets = {edge["target"]: edge.get("ip") for edge in graph["edges"]}
+    assert edge_targets == {"SW02": "192.168.2.10", "SW03": "192.168.2.11"}
+
+
+def test_build_topology_graph_neighbor_without_ip_remains_compatible():
+    summaries = [
+        {
+            "device": "SW01",
+            "vendor": "cisco",
+            "role": "switch",
+            "discovered_neighbors": [
+                {"neighbor": "SW02", "source": "show cdp neighbors detail"},
+            ],
+        }
+    ]
+    graph = build_topology_graph(summaries)
+    assert graph["nodes"]["SW01"]["neighbors"] == ["SW02"]
+    assert graph["nodes"]["SW01"]["neighbor_addresses"] == {}
+    assert graph["edges"] == [{"source": "SW01", "target": "SW02"}]
+
+
 def test_ssh_client_retries_on_legacy_kex_failure(monkeypatch):
     calls = {"count": 0}
 
