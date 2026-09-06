@@ -3904,3 +3904,30 @@ Risks Resolved:
 
 Next Recommended Action:
 - Run GPT review of PHASE-068; if approved, execute PHASE-069-MACAddressNeighbourIdentifierEvidenceReview or prepare a fresh portable build to validate all FT060920260035 findings together.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-068B-LauncherRegressionAndCheckpointClosure
+
+Changes:
+- Replaced duplicated launcher-text regression tests in tests/test_build_portable.py with a single production-coupled test that invokes build_portable._build_embedded() directly.
+- Added test helpers to stage a minimal repo, create a fake embedded python layout, and mock network downloads, zip extraction, and pip subprocess installs.
+- Committed outstanding PHASE-066/067/068/069 artefacts to produce a clean HEAD, then rebuilt dist/NetworkReconEngine.zip.
+- Verified build_manifest.json reports dirty:false and commit_sha matching HEAD (2ff1c6b).
+- Verified extracted Start_NetworkRecon.ps1 executes --help successfully.
+
+Reason:
+- Terra's PHASE-068A review identified that the original regression tests validated fixture-duplicated text and the packaged build was not traceable to the remediation commit; PHASE-068B closes those coverage and checkpoint gaps.
+
+Risks Introduced:
+- None expected (test-only change plus a clean rebuild).
+
+Risks Resolved:
+- Launcher generation path is now protected by tests that fail if production code regresses.
+- Portable build is now traceable to a clean committed checkpoint.
+
+Next Recommended Action:
+- Run GPT review of PHASE-068B; if approved, close the PHASE-068 family and proceed to PHASE-069 evidence review or field validation.
