@@ -683,6 +683,49 @@ def test_ssh_client_retries_on_legacy_kex_failure(monkeypatch):
     assert calls["count"] == 2
 
 
+def test_zip_bundle_preserves_ip_named_directory(tmp_path):
+    """PHASE-066: IP-address-named device directories must not be truncated to .zip."""
+    from app.collector import zip_bundle
+
+    device_dir = tmp_path / "192.168.2.241"
+    device_dir.mkdir()
+    (device_dir / "summary.json").write_text(json.dumps({"device": "192.168.2.241"}))
+
+    archive_path = zip_bundle(device_dir)
+    assert archive_path.name == "192.168.2.241.zip"
+    assert archive_path.exists()
+
+
+def test_zip_bundle_distinct_prefixes_produce_distinct_archives(tmp_path):
+    """PHASE-066: IP prefixes must not collide when zipped."""
+    from app.collector import zip_bundle
+
+    dir_a = tmp_path / "192.168.2.241"
+    dir_b = tmp_path / "192.168.2.2"
+    dir_a.mkdir()
+    dir_b.mkdir()
+    (dir_a / "summary.json").write_text(json.dumps({"device": "192.168.2.241"}))
+    (dir_b / "summary.json").write_text(json.dumps({"device": "192.168.2.2"}))
+
+    archive_a = zip_bundle(dir_a)
+    archive_b = zip_bundle(dir_b)
+    assert archive_a.name == "192.168.2.241.zip"
+    assert archive_b.name == "192.168.2.2.zip"
+    assert archive_a != archive_b
+
+
+def test_zip_bundle_non_ip_device_name_unchanged(tmp_path):
+    """PHASE-066: non-IP device names still produce correctly named zips."""
+    from app.collector import zip_bundle
+
+    device_dir = tmp_path / "sw01.example.com"
+    device_dir.mkdir()
+    (device_dir / "summary.json").write_text(json.dumps({"device": "sw01.example.com"}))
+
+    archive_path = zip_bundle(device_dir)
+    assert archive_path.name == "sw01.example.com.zip"
+
+
 def test_ssh_client_explain_error_includes_kex_diagnostics():
     peer_kex = ["diffie-hellman-group1-sha1"]
     explanation = DeviceSSHClient.explain_compatibility_error(

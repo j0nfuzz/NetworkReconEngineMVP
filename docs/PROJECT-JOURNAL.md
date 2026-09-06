@@ -3855,3 +3855,52 @@ Risks Resolved:
 
 Next Recommended Action:
 - Run GPT review of PHASE-067; if approved, implement PHASE-068-VerboseConsoleOutputBufferingRemediation next.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-066-DeviceZipFilenameTruncationRemediation
+
+Changes:
+- Updated app/collector.py::zip_bundle() to use the full directory name as the archive stem instead of Path.with_suffix(".zip"), preventing truncation of IP-address-named device directories (e.g. "192.168.2.241" becoming "192.168.1").
+- Added regression tests in tests/test_cli.py covering IP-named directory preservation, distinct prefix collision avoidance, and unchanged non-IP device naming.
+- Created docs/Phases/IMPLEMENTED-PHASE-066-DeviceZipFilenameTruncationRemediation.md.
+
+Reason:
+- Field evidence FT060920260035 showed device zip archives for IP-named directories were truncated by Path.with_suffix(); PHASE-066 restores unique archive identity without altering directory naming or collected data.
+
+Risks Introduced:
+- None expected; archive location and extension unchanged, only the stem is fully preserved.
+
+Risks Resolved:
+- IP-named device zip archives no longer collide or truncate in field bundles.
+
+Next Recommended Action:
+- Run GPT review of PHASE-066; if approved, implement PHASE-068-VerboseConsoleOutputBufferingRemediation or execute PHASE-069 evidence review next.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-068-VerboseConsoleOutputBufferingRemediation
+
+Changes:
+- Updated run_portable.py to call sys.stdout.reconfigure(line_buffering=True) on startup for incremental verbose output under embedded-runtime interpreters.
+- Updated build_portable.py to emit PYTHONUNBUFFERED=1 and the -u interpreter flag in Start_NetworkRecon.cmd and Start_NetworkRecon.ps1 launcher scripts.
+- No changes to app/cli.py, app/orchestrator.py, log_verbose() logic, verbose message content, or CLI arguments.
+- Created docs/Phases/IMPLEMENTED-PHASE-068-VerboseConsoleOutputBufferingRemediation.md.
+
+Reason:
+- Field evidence FT060920260035 showed verbose output was batched until process exit under the packaged launcher; PHASE-068 applies unbuffered stdout at the launcher/runtime level rather than scattering flush=True across the application.
+
+Risks Introduced:
+- Negligible I/O throughput reduction from unbuffered stdout; acceptable for this tool's console volume.
+
+Risks Resolved:
+- Verbose console output is no longer batched until process exit under the packaged launcher.
+
+Next Recommended Action:
+- Run GPT review of PHASE-068; if approved, execute PHASE-069-MACAddressNeighbourIdentifierEvidenceReview or prepare a fresh portable build to validate all FT060920260035 findings together.

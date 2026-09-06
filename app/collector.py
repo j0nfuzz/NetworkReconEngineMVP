@@ -164,7 +164,7 @@ def execute_device_collection(device: Device, *, dry_run: bool = False) -> Devic
 
 
 def zip_bundle(device_dir: Path) -> Path:
-    archive_path = device_dir.with_suffix(".zip")
+    archive_path = device_dir.parent / f"{device_dir.name}.zip"
     with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for item in device_dir.iterdir():
             zf.write(item, arcname=item.name)

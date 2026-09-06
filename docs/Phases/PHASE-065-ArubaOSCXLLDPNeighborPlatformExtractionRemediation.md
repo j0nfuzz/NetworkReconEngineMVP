@@ -1,3 +1,6 @@
+SUPERSEDED / NON-AUTHORITATIVE:
+This phase's evidence premise is superseded by ArubaOSCXLLDPFieldValidation field findings (FT060920260035.zip): the neighbour data defects are more fundamental than platform extraction alone — neighbour address identity (topology.json drops per-neighbour IP entirely) and neighbour identifier validity (MAC-address fallback identity) precede and are independent of vendor classification. Superseded by PHASE-067-NeighbourAddressIdentityTopologyRemediation and PHASE-069-MACAddressNeighbourIdentifierEvidenceReview. Retained for evidence/history only; do not treat as authoritative for future remediation planning.
+
 PHASE:
 PHASE-065-ArubaOSCXLLDPNeighborPlatformExtractionRemediation
 

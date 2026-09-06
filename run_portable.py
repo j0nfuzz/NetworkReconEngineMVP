@@ -2,6 +2,11 @@
 import sys
 from pathlib import Path
 
+# Force unbuffered line output for incremental verbose feedback under
+# redirected/piped embedded-runtime consoles.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)
+
 # Ensure the bundle root is on sys.path when the embedded interpreter is used.
 _bundle_root = Path(__file__).resolve().parent
 if str(_bundle_root) not in sys.path:
