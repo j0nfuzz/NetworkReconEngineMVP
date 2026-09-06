@@ -4007,3 +4007,29 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-071: execute the approved portable build in the field, capture evidence, and produce a sanitised findings report.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: PHASE-072-ArubaOSCXNeighborClassificationMetadataRemediation
+
+Changes:
+- Reviewed PHASE-071 field evidence (FT060920261728.zip): seed collection succeeded, PHASE-067 address retention confirmed, but recursive traversal did not advance past the seed.
+- Root-caused the stall: app/discovery.py's ArubaOS-CX LLDP branch never extracts Neighbor System-Description/Chassis Capabilities, so classify_neighbor_support() cannot classify any neighbor above "unknown", blocking traversal eligibility despite correct identity/address extraction.
+- Determined this is distinct from PHASE-058 (block/field mismatch, already fixed) and is a narrower classification-metadata gap.
+- Created docs/Phases/PHASE-072-ArubaOSCXNeighborClassificationMetadataRemediation.md.
+- Confirmed console-progress visibility in recursive mode is a separate, unrelated concern requiring its own phase.
+
+Reason:
+- Field evidence shows real, reachable Aruba/UAP neighbors are discovered with correct IPs but never queued for collection, defeating the recursive-traversal design; the smallest fix is restoring the classification input the parser already omits.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- Distinguishes the classification-metadata gap from PHASE-058 and from console-visibility, preventing scope conflation in remediation.
+
+Next Recommended Action:
+- Implement PHASE-072; separately consider a console-progress-visibility phase for recursive mode if still valued after PHASE-072 closes.
