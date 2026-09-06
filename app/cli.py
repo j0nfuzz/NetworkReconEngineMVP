@@ -18,6 +18,7 @@ from app.config import load_default_credentials, load_devices
 from app.detector import classify_role, identify_device
 from app.models import Device, DeviceIdentity
 from app.orchestrator import run_recursive_collection
+from app.provenance import capture_provenance
 from app.scope import build_troubleshooting_scope
 from app.topology import build_topology_graph
 
@@ -91,6 +92,53 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+class _VerboseTee:
+    """Print verbose messages to console and append them to a log file."""
+
+    def __init__(self, log_path: Path, verbose: bool) -> None:
+        self.log_path = log_path
+        self.verbose = verbose
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def __call__(self, message: str) -> None:
+        if self.verbose:
+            print(message)
+        with self.log_path.open("a", encoding="utf-8") as f:
+            f.write(message + "\n")
+
+
+def _write_manifest_and_topology(output_root: Path, bundle_summary: Dict[str, Any]) -> None:
+    """Persist the current bundle manifest and topology graph to disk."""
+    output_root.mkdir(parents=True, exist_ok=True)
+    manifest_path = output_root / "bundle_manifest.json"
+    manifest_path.write_text(json.dumps(bundle_summary, indent=2), encoding="utf-8")
+    topology = build_topology_graph(device["summary"] for device in bundle_summary["devices"])
+    topology_path = output_root / "topology.json"
+    topology_path.write_text(json.dumps(topology, indent=2), encoding="utf-8")
+
+
+def _on_device_collected(
+    name: str,
+    bundle,
+    output_root: Path,
+    bundle_summary: Dict[str, Any],
+    log_verbose,
+    provenance: Dict[str, Any],
+) -> None:
+    """Stream a single device bundle and update live aggregate artefacts."""
+    log_verbose(f"[verbose] Starting device: {name} ({bundle.summary.get('hostname', '')})")
+    log_verbose(f"[verbose] Finished collection for {name}: {bundle.summary.get('status')}")
+    device_dir = write_bundle(bundle, output_root)
+    bundle_summary["devices"].append({
+        "name": name,
+        "vendor": bundle.device_vendor,
+        "bundle_path": str(device_dir),
+        "status": bundle.summary.get("status"),
+        "summary": bundle.summary,
+    })
+    _write_manifest_and_topology(output_root, bundle_summary)
+
+
 def _run_recursive_cli(
     seed_device: Device,
     config_path: str,
@@ -107,9 +155,12 @@ def _run_recursive_cli(
     """Run recursive collection from a seed device and populate bundle_summary."""
     default_credentials = load_default_credentials(config_path)
 
+    tee = isinstance(log_verbose, _VerboseTee)
     if dry_run:
         log_verbose("[verbose] Recursive dry-run: skipping real collection")
         bundle = execute_device_collection(seed_device, dry_run=True)
+        log_verbose(f"[verbose] Starting device: {seed_device.name} ({seed_device.hostname})")
+        log_verbose(f"[verbose] Finished collection for {seed_device.name}: {bundle.summary.get('status')}")
         device_dir = write_bundle(bundle, output_root)
         bundle_summary["devices"].append({
             "name": seed_device.name,
@@ -118,6 +169,7 @@ def _run_recursive_cli(
             "status": bundle.summary.get("status"),
             "summary": bundle.summary,
         })
+        _write_manifest_and_topology(output_root, bundle_summary)
         return
 
     resume_state = None
@@ -141,6 +193,22 @@ def _run_recursive_cli(
         else:
             log_verbose(f"[verbose] Targeting {target_device} as traversal root; scope will expand as neighbours are discovered")
 
+    streamed_devices: set[str] = set()
+    provenance = capture_provenance()
+
+    def on_device_collected(name, bundle, state):
+        if name in streamed_devices:
+            return
+        streamed_devices.add(name)
+        _on_device_collected(
+            name,
+            bundle,
+            output_root,
+            bundle_summary,
+            log_verbose,
+            provenance=provenance,
+        )
+
     if target_device is not None:
         from app.parallel_collector import run_parallel_scoped_collection
 
@@ -159,6 +227,7 @@ def _run_recursive_cli(
             default_credentials=default_credentials,
             resume_state=resume_state,
             on_collected=on_collected,
+            on_device_collected=on_device_collected,
             allowed_devices=allowed_devices,
         )
         bundle_items = result["bundles"].items()
@@ -167,6 +236,8 @@ def _run_recursive_cli(
         log_verbose(f"[verbose] Probe error for {name}: {error}")
 
     for name, bundle in bundle_items:
+        if name in streamed_devices:
+            continue
         log_verbose(f"[verbose] Starting device: {name} ({bundle.summary.get('hostname', '')})")
         log_verbose(f"[verbose] Finished collection for {name}: {bundle.summary.get('status')}")
         device_dir = write_bundle(bundle, output_root)
@@ -177,6 +248,7 @@ def _run_recursive_cli(
             "status": bundle.summary.get("status"),
             "summary": bundle.summary,
         })
+        _write_manifest_and_topology(output_root, bundle_summary)
 
 
 _IPV4_RE = re.compile(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
@@ -275,6 +347,8 @@ def _run_cli_collection(
         "devices": [],
     }
 
+    log_path = output_root / "console.log"
+
     def log_verbose(message: str) -> None:
         if verbose:
             print(message)
@@ -282,6 +356,7 @@ def _run_cli_collection(
     no_recurse = getattr(args, "no_recurse", False)
     recurse = bool(devices and not no_recurse)
     if recurse:
+        log_verbose = _VerboseTee(log_path, verbose)
         if args.target_device:
             target_matches = [d for d in devices if d.name == args.target_device]
             if not target_matches:
@@ -374,11 +449,12 @@ def _run_cli_collection(
             })
 
     manifest_path = output_root / "bundle_manifest.json"
-    manifest_path.write_text(json.dumps(bundle_summary, indent=2), encoding="utf-8")
+    if not isinstance(log_verbose, _VerboseTee):
+        manifest_path.write_text(json.dumps(bundle_summary, indent=2), encoding="utf-8")
 
-    topology = build_topology_graph(device["summary"] for device in bundle_summary["devices"])
-    topology_path = output_root / "topology.json"
-    topology_path.write_text(json.dumps(topology, indent=2), encoding="utf-8")
+        topology = build_topology_graph(device["summary"] for device in bundle_summary["devices"])
+        topology_path = output_root / "topology.json"
+        topology_path.write_text(json.dumps(topology, indent=2), encoding="utf-8")
 
     print(f"Generated bundle manifest: {manifest_path}")
     return 0

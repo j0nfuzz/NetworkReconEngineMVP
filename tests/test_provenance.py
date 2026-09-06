@@ -126,3 +126,29 @@ def test_write_provenance_artifact_uses_provided_payload(tmp_path):
     }
     artifact_path = write_provenance_artifact(tmp_path, provenance=provided)
     assert json.loads(artifact_path.read_text(encoding="utf-8")) == provided
+
+
+def test_capture_provenance_falls_back_to_runtime_file_when_git_unavailable(
+    monkeypatch, tmp_path
+):
+    """PHASE-076: portable deployments without .git use embedded build provenance."""
+    monkeypatch.setattr(provenance_module, "_run_git", lambda *args: "")
+
+    runtime_path = tmp_path / "build_runtime_provenance.json"
+    runtime_path.write_text(
+        json.dumps(
+            {
+                "head_commit_sha": "abc123def456",
+                "dirty": "false",
+                "patch": "",
+                "patch_checksum": "",
+                "excluded_paths": "config/*.yml",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(provenance_module, "RUNTIME_PROVENANCE_PATH", runtime_path)
+
+    result = capture_provenance()
+    assert result["head_commit_sha"] == "abc123def456"
+    assert result["dirty"] == "false"

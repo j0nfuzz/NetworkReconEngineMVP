@@ -225,6 +225,18 @@ def _build_embedded(repo_root: Path, dist_dir: Path, *, legacy: bool = False) ->
         json.dumps(build_manifest, indent=2), encoding="utf-8"
     )
 
+    # Embed provenance for runtime retrieval when .git is not available.
+    runtime_provenance = {
+        "head_commit_sha": provenance.get("head_commit_sha", "unknown"),
+        "dirty": provenance.get("dirty", "unknown"),
+        "patch": provenance.get("patch", ""),
+        "patch_checksum": provenance.get("patch_checksum", ""),
+        "excluded_paths": provenance.get("excluded_paths", ""),
+    }
+    (bundle_dir / "build_runtime_provenance.json").write_text(
+        json.dumps(runtime_provenance, indent=2), encoding="utf-8"
+    )
+
     dist_dir.mkdir(parents=True, exist_ok=True)
     zip_path = dist_dir / "NetworkReconEngine.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:

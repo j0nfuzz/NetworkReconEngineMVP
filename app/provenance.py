@@ -7,7 +7,22 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
+
+
+# Path to a static provenance file that can be shipped with portable builds.
+# Generated at build time so field execution without .git still knows its source.
+RUNTIME_PROVENANCE_PATH = Path(sys.executable).parent / "build_runtime_provenance.json"
+
+
+def _load_runtime_provenance() -> dict[str, Any] | None:
+    """Load build-time provenance shipped with the runtime, if present."""
+    try:
+        if RUNTIME_PROVENANCE_PATH.exists():
+            return json.loads(RUNTIME_PROVENANCE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        pass
+    return None
 
 
 DEFAULT_EXCLUDED_PATHS = ("config/*.yml",)
@@ -55,14 +70,35 @@ def _run_git(*args: str) -> str:
 
 
 def get_head_commit_sha() -> str:
-    """Return the HEAD commit SHA, or 'unknown' if not in a git repository."""
+    """Return the HEAD commit SHA, or 'unknown' if not in a git repository.
+
+    Falls back to a build-time provenance file shipped with portable runtimes.
+    """
     sha = _run_git("rev-parse", "HEAD")
-    return sha if sha else "unknown"
+    if sha:
+        return sha
+    runtime = _load_runtime_provenance()
+    if runtime:
+        return runtime.get("head_commit_sha", "unknown")
+    return "unknown"
 
 
 def is_working_tree_dirty() -> bool:
-    """Return True if the working tree has uncommitted changes."""
-    return _run_git("status", "--porcelain") != ""
+    """Return True if the working tree has uncommitted changes.
+
+    Portable runtimes without .git are considered clean if the shipped runtime
+    provenance is present; otherwise falls back to git status.
+    """
+    porcelain = _run_git("status", "--porcelain")
+    if porcelain != "":
+        return True
+    if porcelain == "" and _run_git("rev-parse", "--git-dir") != "":
+        return False
+    runtime = _load_runtime_provenance()
+    if runtime:
+        dirty = runtime.get("dirty", "unknown")
+        return dirty == "true"
+    return False
 
 
 def get_unified_diff_patch(excluded_paths: Optional[tuple[str, ...]] = None) -> str:
@@ -94,8 +130,20 @@ def capture_provenance(excluded_paths: Optional[tuple[str, ...]] = None) -> dict
     - excluded_paths (comma-separated list)
     """
     if not _provenance_capture_enabled or _env_disables_capture():
+        # When capture is disabled we must not shell out to git; rely on any
+        # embedded runtime provenance or return unknown.
+        runtime = _load_runtime_provenance()
+        if runtime:
+            return {
+                "head_commit_sha": runtime.get("head_commit_sha", "unknown"),
+                "dirty": runtime.get("dirty", "unknown"),
+                "patch": runtime.get("patch", ""),
+                "patch_checksum": runtime.get("patch_checksum", ""),
+                "excluded_paths": runtime.get("excluded_paths", ",".join(excluded_paths or DEFAULT_EXCLUDED_PATHS)),
+                "capture_disabled": "true",
+            }
         return {
-            "head_commit_sha": get_head_commit_sha(),
+            "head_commit_sha": "unknown",
             "dirty": "unknown",
             "patch": "",
             "patch_checksum": "",
@@ -107,6 +155,13 @@ def capture_provenance(excluded_paths: Optional[tuple[str, ...]] = None) -> dict
     dirty = is_working_tree_dirty()
     patch = get_unified_diff_patch(excluded_paths=excluded_paths) if dirty else ""
     checksum = compute_checksum(patch) if patch else ""
+    if not patch and head == "unknown":
+        runtime = _load_runtime_provenance()
+        if runtime:
+            head = runtime.get("head_commit_sha", "unknown")
+            dirty = runtime.get("dirty", "unknown") == "true"
+            patch = runtime.get("patch", "")
+            checksum = runtime.get("patch_checksum", "")
     return {
         "head_commit_sha": head,
         "dirty": "true" if dirty else "false",

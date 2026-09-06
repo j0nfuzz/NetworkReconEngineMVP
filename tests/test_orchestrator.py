@@ -113,6 +113,35 @@ def test_visited_neighbor_not_requeued(monkeypatch):
     assert [d.name for d in collector.calls] == ["SW01", "SW02"]
 
 
+def test_on_device_collected_callback_fires_per_device(monkeypatch):
+    """PHASE-077: per-device callback receives bundle and checkpoint state."""
+    seed = Device(name="SW01", hostname="10.0.0.1", vendor="cisco")
+    responses = {
+        "SW01": _make_bundle(
+            "SW01",
+            "cisco",
+            "collected",
+            [{"neighbor": "SW02", "ip": "10.0.0.2", "platform": "cisco WS-C2960-24TC-L"}],
+        ),
+        "SW02": _make_bundle("SW02", "cisco", "collected", []),
+    }
+    collector = _FakeCollector(responses)
+    monkeypatch.setattr("app.orchestrator.execute_device_collection", collector)
+
+    captured = []
+
+    def on_device_collected(name, bundle, state):
+        captured.append({"name": name, "status": bundle.summary.get("status"), "state": state})
+
+    result = run_recursive_collection(seed, on_device_collected=on_device_collected)
+    assert result["successful"] == ["SW01", "SW02"]
+    assert len(captured) == 2
+    assert captured[0]["name"] == "SW01"
+    assert captured[0]["status"] == "collected"
+    assert "visited" in captured[0]["state"]
+    assert captured[1]["name"] == "SW02"
+
+
 def test_neighbor_missing_ip_skipped(monkeypatch):
     seed = Device(name="SW01", hostname="10.0.0.1", vendor="cisco")
     collector = _FakeCollector(

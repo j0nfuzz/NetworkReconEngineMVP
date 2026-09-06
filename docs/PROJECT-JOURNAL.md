@@ -4234,3 +4234,32 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-077-RecursiveLiveArtefactAndConsoleStreaming and PHASE-076-PortableBuildProvenancePropagation concurrently.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-076-PortableBuildProvenancePropagation and PHASE-077-RecursiveLiveArtefactAndConsoleStreaming
+
+Changes:
+- Implemented PHASE-076: app/provenance.py now loads build_runtime_provenance.json as a fallback when .git is absent; build_portable.py embeds this file; capture_provenance() no longer shells out to git when capture is disabled.
+- Implemented PHASE-077: app/orchestrator.py invokes an on_device_collected callback after each device; app/cli.py uses it to write device bundles, bundle_manifest.json, topology.json, and console.log live during recursive traversal instead of buffering until the run ends.
+- Added regression tests for both phases.
+- Full pytest suite: 330 passed, 1 warning.
+- Created docs/Phases/IMPLEMENTED-PHASE-076-PortableBuildProvenancePropagation.md and docs/Phases/IMPLEMENTED-PHASE-077-RecursiveLiveArtefactAndConsoleStreaming.md.
+
+Reason:
+- PHASE-076 closes the portable-deployment provenance gap identified in FT060920261842 where build_provenance.json recorded head_commit_sha: unknown.
+- PHASE-077 closes the live-observability gap where recursive runs produced no console output and no artefacts until the process exited.
+
+Risks Introduced:
+- Higher per-device I/O during recursive runs.
+- Static embedded provenance can go stale if a portable build is reused without rebuilding.
+
+Risks Resolved:
+- Field evidence from portable builds is traceable to source.
+- Interrupted recursive runs retain partial evidence; operators get live progress and a persistent console log.
+
+Next Recommended Action:
+- Build a fresh portable bundle from clean HEAD, then run Terra/GPT review of PHASE-076/077 before field validation.

@@ -101,10 +101,17 @@ def run_recursive_collection(
     *,
     max_devices: int = 100,
     on_collected: Any = None,
+    on_device_collected: Any = None,
     resume_state: Optional[Dict[str, Any]] = None,
     allowed_devices: Optional[set[str]] = None,
 ) -> Dict[str, Any]:
-    """Collect from a seed device, then recursively collect from supported neighbors."""
+    """Collect from a seed device, then recursively collect from supported neighbors.
+
+    Args:
+        on_device_collected: Optional callback invoked immediately after each device
+            is collected. Receives (device_name, bundle) so callers can stream artefacts
+            live instead of buffering until the run finishes.
+    """
     defaults = default_credentials or {}
     resume = resume_state or {}
     visited: set[str] = set(resume.get("visited", []))
@@ -142,16 +149,17 @@ def run_recursive_collection(
         bundles[device.name] = bundle
 
         def _emit_checkpoint() -> None:
+            state = state_to_checkpoint(
+                visited=visited,
+                queued=queued,
+                successful=successful,
+                failed=failed,
+                unsupported=unsupported,
+            )
             if callable(on_collected):
-                on_collected(
-                    state_to_checkpoint(
-                        visited=visited,
-                        queued=queued,
-                        successful=successful,
-                        failed=failed,
-                        unsupported=unsupported,
-                    )
-                )
+                on_collected(state)
+            if callable(on_device_collected):
+                on_device_collected(device.name, bundle, state)
 
         status = bundle.summary.get("status")
         if status in ("collected", "dry-run-success", "partial"):

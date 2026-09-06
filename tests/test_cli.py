@@ -3204,6 +3204,96 @@ def test_target_device_becomes_traversal_root_without_topology(monkeypatch, tmp_
     assert captured["allowed_devices"] is None
 
 
+def test_recursive_cli_writes_device_bundle_before_traversal_completes(monkeypatch, tmp_path):
+    """PHASE-077: per-device bundle and manifest are written live during recursive traversal."""
+    device_dict = {
+        "name": "seed-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    barrier = {"released": False}
+
+    def fake_run_recursive_collection(
+        seed_device,
+        default_credentials=None,
+        *,
+        on_device_collected=None,
+        **kwargs,
+    ):
+        # Simulate two devices, streaming the first before the second completes.
+        seed_bundle = DeviceBundle(
+            device_name="seed-sw",
+            device_vendor="cisco",
+            timestamp="2026-08-04T00:00:00Z",
+            summary={
+                "status": "collected",
+                "hostname": "10.0.0.1",
+                "commands_run": 0,
+                "failed_commands": [],
+            },
+            raw_outputs={},
+            failed_commands=[],
+        )
+        if callable(on_device_collected):
+            on_device_collected("seed-sw", seed_bundle, {"visited": {"seed-sw"}})
+
+        # Assert the first device bundle already exists on disk before second device.
+        assert (tmp_path / "seed-sw" / "summary.json").exists()
+        assert (tmp_path / "bundle_manifest.json").exists()
+        assert (tmp_path / "console.log").exists()
+
+        neighbor_bundle = DeviceBundle(
+            device_name="neighbor-sw",
+            device_vendor="cisco",
+            timestamp="2026-08-04T00:00:00Z",
+            summary={
+                "status": "collected",
+                "hostname": "10.0.0.2",
+                "commands_run": 0,
+                "failed_commands": [],
+            },
+            raw_outputs={},
+            failed_commands=[],
+        )
+        if callable(on_device_collected):
+            on_device_collected("neighbor-sw", neighbor_bundle, {"visited": {"seed-sw", "neighbor-sw"}})
+        barrier["released"] = True
+
+        return {
+            "successful": ["seed-sw", "neighbor-sw"],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {"seed-sw": seed_bundle, "neighbor-sw": neighbor_bundle},
+            "probe_errors": {},
+        }
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--recursive",
+        "--verbose",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert barrier["released"] is True
+    manifest = json.loads((tmp_path / "bundle_manifest.json").read_text(encoding="utf-8"))
+    assert len(manifest["devices"]) == 2
+    console = (tmp_path / "console.log").read_text(encoding="utf-8")
+    assert "[verbose] Starting device: seed-sw" in console
+    assert "[verbose] Finished collection for seed-sw" in console
+
+
 def test_target_device_with_topology_uses_scoped_collection(monkeypatch, tmp_path):
     """PHASE-052: --target-device with an existing topology.json still scopes to neighbours."""
     device_dicts = [
