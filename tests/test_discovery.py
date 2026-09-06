@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from app.classification import classify_neighbor_support
 from app.discovery import extract_neighbors
 
 
@@ -78,6 +79,8 @@ def test_extract_neighbors_arubacx_lldp_detail_finds_neighbors():
         "neighbor": "NEIGHBOR-01",
         "ip": "192.0.2.10",
         "source": "show lldp neighbor-info detail",
+        "platform": "<VENDOR_DEVICE_TYPE>, <VERSION_STRING>",
+        "capabilities": "Bridge, Router",
     }
     assert by_name["00:11:22:33:44:55"] == {
         "neighbor": "00:11:22:33:44:55",
@@ -133,3 +136,69 @@ System Name: EDGE-SW01
     assert "CORE-SW01" in by_name
     assert "EDGE-SW01" in by_name
     assert by_name["EDGE-SW01"]["ip"] == "10.0.0.5"
+
+
+def test_extract_neighbors_arubacx_lldp_detail_populates_platform_and_capabilities():
+    """PHASE-072: system description and capabilities enable neighbor classification."""
+    detail = """\
+--------------------------------------------------------------------------------
+Port                           : 1/1/48
+Neighbor System-Name           : HOSTNAME-06
+Neighbor System-Description    : Aruba R8N85A  PL.10.11.1021
+Neighbor Chassis-ID            : 00:11:22:33:44:b5
+Neighbor Management-Address    : 192.168.2.242
+Chassis Capabilities Available : Bridge, Router
+Chassis Capabilities Enabled   : Bridge, Router
+Neighbor Port-ID               : 1/1/48
+--------------------------------------------------------------------------------
+"""
+    neighbors = extract_neighbors("aruba", {"show lldp neighbor-info detail": detail})
+    assert len(neighbors) == 1
+    neighbor = neighbors[0]
+    assert neighbor["neighbor"] == "HOSTNAME-06"
+    assert neighbor["ip"] == "192.168.2.242"
+    assert neighbor["platform"] == "Aruba R8N85A  PL.10.11.1021"
+    assert neighbor["capabilities"] == "Bridge, Router"
+    assert classify_neighbor_support(neighbor) == "aruba"
+
+
+def test_extract_neighbors_arubacx_lldp_detail_falls_back_to_platform_when_no_management_address():
+    """PHASE-072: system description still provides classification even without an IP."""
+    detail = """\
+--------------------------------------------------------------------------------
+Port                           : 1/1/1
+Neighbor System-Name           :
+Neighbor System-Description    : Cisco Catalyst 9300, 17.9.5
+Neighbor Chassis-ID            : 00:11:22:33:44:55
+Neighbor Management-Address    :
+Chassis Capabilities Available : Bridge, Router
+Chassis Capabilities Enabled   : Bridge, Router
+--------------------------------------------------------------------------------
+"""
+    neighbors = extract_neighbors("aruba", {"show lldp neighbor-info detail": detail})
+    assert len(neighbors) == 1
+    neighbor = neighbors[0]
+    assert neighbor["neighbor"] == "00:11:22:33:44:55"
+    assert "ip" not in neighbor
+    assert neighbor["platform"] == "Cisco Catalyst 9300, 17.9.5"
+    assert neighbor["capabilities"] == "Bridge, Router"
+    assert classify_neighbor_support(neighbor) == "cisco"
+
+
+def test_extract_neighbors_arubacx_lldp_detail_preserves_chassis_platform_when_no_description():
+    """PHASE-072: existing behaviour preserved when system description is absent."""
+    detail = """\
+--------------------------------------------------------------------------------
+Port                           : 1/1/1
+Neighbor System-Name           :
+Neighbor System-Description    :
+Neighbor Chassis-ID            : 00:11:22:33:44:55
+Neighbor Management-Address    :
+--------------------------------------------------------------------------------
+"""
+    neighbors = extract_neighbors("aruba", {"show lldp neighbor-info detail": detail})
+    assert len(neighbors) == 1
+    neighbor = neighbors[0]
+    assert neighbor["neighbor"] == "00:11:22:33:44:55"
+    assert neighbor.get("platform") == "00:11:22:33:44:55"
+    assert classify_neighbor_support(neighbor) == "unknown"

@@ -2040,6 +2040,73 @@ def test_recursive_cli_dry_run_does_not_invoke_orchestrator(monkeypatch, tmp_pat
     assert manifest["devices"][0]["status"] == "dry-run-success"
 
 
+def test_recursive_cli_verbose_logs_start_and_finish_for_each_device(monkeypatch, tmp_path, capsys):
+    """PHASE-073: recursive verbose output must show per-device start/finish progress."""
+    config_path = tmp_path / "devices.yml"
+    config_path.write_text(
+        "devices:\n"
+        "  - name: seed-sw\n"
+        "    hostname: 10.0.0.1\n"
+        "    vendor: cisco\n"
+        "    username: admin\n"
+        "    password: <PASSWORD-01>\n"
+    , encoding="utf-8")
+
+    def fake_run_recursive_collection(
+        seed_device,
+        default_credentials=None,
+        *,
+        max_devices=100,
+        on_collected=None,
+        resume_state=None,
+        **kwargs,
+    ):
+        from app.models import DeviceBundle
+
+        bundle = DeviceBundle(
+            device_name=seed_device.name,
+            device_vendor=seed_device.vendor,
+            timestamp="2026-08-04T00:00:00Z",
+            summary={"status": "collected", "hostname": seed_device.hostname, "commands_run": 1, "failed_commands": []},
+            raw_outputs={},
+            failed_commands=[],
+        )
+        return {
+            "successful": [seed_device.name],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {seed_device.name: bundle},
+            "probe_errors": {},
+        }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [{
+        "name": "seed-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }])
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+    monkeypatch.setattr("app.cli.write_bundle", lambda bundle, output_dir: output_dir / bundle.device_name)
+
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        str(config_path),
+        "--output-dir",
+        str(tmp_path),
+        "--recursive",
+        "--verbose",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    captured = capsys.readouterr().out
+    assert "[verbose] Starting device: seed-sw (10.0.0.1)" in captured
+    assert "[verbose] Finished collection for seed-sw: collected" in captured
+
+
 def test_recursive_cli_uses_config_default_block_for_credentials(monkeypatch, tmp_path):
     """Default credentials for recursive neighbors come from the config default block, not seed overrides."""
     from app.config import load_default_credentials

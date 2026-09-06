@@ -167,6 +167,7 @@ def _run_recursive_cli(
         log_verbose(f"[verbose] Probe error for {name}: {error}")
 
     for name, bundle in bundle_items:
+        log_verbose(f"[verbose] Starting device: {name} ({bundle.summary.get('hostname', '')})")
         log_verbose(f"[verbose] Finished collection for {name}: {bundle.summary.get('status')}")
         device_dir = write_bundle(bundle, output_root)
         bundle_summary["devices"].append({

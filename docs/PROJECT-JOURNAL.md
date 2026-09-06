@@ -4057,3 +4057,54 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-072 and PHASE-073 concurrently; both are independent and file-disjoint.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-072-ArubaOSCXNeighborClassificationMetadataRemediation
+
+Changes:
+- Extended app/discovery.py::_parse_lldp_neighbors() ArubaOS-CX branch to extract Neighbor System-Description as "platform" and Chassis Capabilities Available as "capabilities".
+- Preserved existing neighbor identity, IP extraction, and chassis-id platform fallback.
+- Added sanitised field-evidence-derived regression tests in tests/test_discovery.py for Aruba, Cisco, and unknown classification cases.
+- Updated existing PHASE-058 test expectation to include newly extracted fields.
+- Created docs/Phases/IMPLEMENTED-PHASE-072-ArubaOSCXNeighborClassificationMetadataRemediation.md.
+
+Reason:
+- PHASE-071 field evidence showed reachable ArubaOS-CX neighbors were discovered with management IPs but classified as unknown because the parser omitted the metadata required by classify_neighbor_support(); PHASE-072 closes that classification-metadata gap.
+
+Risks Introduced:
+- System-Description free text is heuristic, same class as existing CDP platform capture.
+
+Risks Resolved:
+- Recursive traversal can now classify and enqueue real ArubaOS-CX LLDP neighbors.
+
+Next Recommended Action:
+- Run Terra/GPT review of PHASE-072 and PHASE-073 together; if approved, produce a fresh portable build and re-run field validation.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-073-RecursiveCollectionPerDeviceProgressLogging
+
+Changes:
+- Added a "[verbose] Starting device: {name} ({hostname})" log line in app/cli.py::_run_recursive_cli() before each existing "Finished collection" line.
+- Preserved all existing finished-collection logging and recursive/parallel orchestration behaviour.
+- Added regression test in tests/test_cli.py proving recursive verbose output includes both start and finish lines.
+- Created docs/Phases/IMPLEMENTED-PHASE-073-RecursiveCollectionPerDeviceProgressLogging.md.
+
+Reason:
+- PHASE-071 evidence showed recursive collection completed silently; PHASE-073 gives operators incremental per-device progress feedback without changing collection semantics.
+
+Risks Introduced:
+- None (logging-only, additive).
+
+Risks Resolved:
+- Operators can now observe that recursive collection is actively progressing through devices.
+
+Next Recommended Action:
+- Run Terra/GPT review of PHASE-072 and PHASE-073 together; if approved, produce a fresh portable build and re-run field validation.

@@ -65,7 +65,9 @@ def _parse_lldp_neighbors(output: str, source_command: str) -> List[Dict[str, st
                 continue
 
             system_value = _field_value(entry, "Neighbor System-Name")
+            description_value = _field_value(entry, "Neighbor System-Description")
             mgmt_value = _field_value(entry, "Neighbor Management-Address")
+            capabilities_value = _field_value(entry, "Chassis Capabilities Available")
             identity = system_value or mgmt_value.split(",")[0].strip()
             if not identity:
                 identity = chassis_value
@@ -80,8 +82,12 @@ def _parse_lldp_neighbors(output: str, source_command: str) -> List[Dict[str, st
                     neighbor["ip"] = candidate
             if not neighbor.get("ip") and re.match(r"\d{1,3}(\.\d{1,3}){3}", chassis_value):
                 neighbor["ip"] = chassis_value
-            if not neighbor.get("ip"):
+            if description_value:
+                neighbor["platform"] = description_value
+            elif not neighbor.get("ip"):
                 neighbor["platform"] = chassis_value
+            if capabilities_value:
+                neighbor["capabilities"] = capabilities_value
             neighbors.append(neighbor)
         return neighbors
 
