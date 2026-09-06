@@ -4523,3 +4523,53 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-082 (clean HEAD, suite, rebuild dist, record evidence); Terra review; then define PHASE-083 field validation against the PHASE-082 build.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-082-FieldValidationBuildRefresh-081ACheckpoint
+
+Changes:
+- Verified clean HEAD c290677ed6cb63170ad36440ef541de7f5ede836 and full suite (343 passed) before build.
+- Rebuilt dist/NetworkReconEngine.zip from clean HEAD, default embedded-runtime mode; prior dist replaced.
+- Recorded evidence: build_manifest.json (commit_sha c290677..., dirty false), build_runtime_provenance.json at bundle root (matching SHA), archive 29,503,838 bytes, SHA-256 664CF1FC3072E550CF440C67728172CA24678EA0BA2DEFEACC9BFB4F6DE8AC1C, example-only config, both launchers validated with full flag surface.
+- Re-ran full suite after build: 343 passed, 1 pre-existing warning.
+- Created docs/Phases/IMPLEMENTED-PHASE-082-FieldValidationBuildRefresh-081ACheckpoint.md.
+
+Reason:
+- PHASE-080/081/081A behaviour manifests only in portable field runs; an attributable clean-tree build is the prerequisite for the next field validation per DD-008 and the PHASE-048/075/078 lineage.
+
+Risks Introduced:
+- None (no source or test changes).
+
+Risks Resolved:
+- A field-attributable build now exists for the 081A checkpoint.
+
+Next Recommended Action:
+- Terra review of PHASE-082; on approval commit and define PHASE-083 field validation.
+
+---
+
+Date: 2026-09-06
+Agent: GPT Reviewer
+
+Phase: PHASE-082-FieldValidationBuildRefresh-081ACheckpoint
+
+Changes:
+- Independently re-extracted the archive, re-derived HEAD/manifest/runtime-provenance agreement (c290677...), archive hash and size, config hygiene, launcher behaviour, and re-ran the full suite (343 passed).
+- Spot-verified PHASE-080 and PHASE-081A code presence inside the packaged bundle.
+- Created docs/Phases/REVIEW-PHASE-082-FieldValidationBuildRefresh-081ACheckpoint.md: Approved, stable checkpoint, PUSH RECOMMENDED; field-validation READY with named verification objectives for PHASE-083.
+
+Reason:
+- All PHASE-082 acceptance criteria met with reviewer-reproduced evidence; provenance fully attributable.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- The 081A checkpoint is packaged and review-approved for field use.
+
+Next Recommended Action:
+- Commit and push per recorded commands; Architect defines PHASE-083 field validation against build SHA-256 664CF1FC...8AC1C.
