@@ -4726,3 +4726,30 @@ Risks Resolved:
 
 Next Recommended Action:
 - Commit and push per recorded commands; execute PHASE-086 at the next field access window; replace the canonical dist artefact when the ScreenConnect lock releases.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: Final disposition - PHASE-083/084/085 closure
+
+Changes:
+- Closed PHASE-083 (field validation by evidence; IMPLEMENTED and REVIEW closure records added for documentation completeness).
+- Closed PHASE-084 (Terra Approved; deviation endorsed; committed de4e536).
+- Closed PHASE-085 (Terra Approved under the environmental-blocker amendment; worktree-built artefact dist/NetworkReconEngine-PHASE-085.zip, commit 462bf43, SHA-256 776B2527...FC30; committed 6de7781).
+- PHASE-086 (second-hop field validation) stands defined and READY; deployment is SHA-gated to the amended-name artefact.
+- Recorded standing housekeeping action: replace the locked canonical dist/NetworkReconEngine.zip (older PHASE-082 build, ScreenConnect PID 22664 handle) with the PHASE-085 artefact and remove the duplicate at the next opportunity; until then the two-archive hazard control in REVIEW-PHASE-085 governs.
+- MVP position updated: the primary objective is field-proven one hop out end-to-end (attribution, credentials, progress, streaming, health penalty); PHASE-086 is the multi-hop completion gate, blocked solely on field access, not engineering.
+
+Reason:
+- All cycle stages executed in order with artefacts at every step; Terra approved both the implementation and the build; no unreviewed source or artefact changes remain.
+
+Risks Introduced:
+- None (documentation-only disposition).
+
+Risks Resolved:
+- Documentation completeness for PHASE-083; single authoritative record of the approved field artefact and its deployment gate.
+
+Next Recommended Action:
+- Execute PHASE-086 at the next field access window using dist/NetworkReconEngine-PHASE-085.zip (verified SHA-256 776B2527A1840C301EBB3074741EC1509FF2E50C138255365EE9F852E16BFC30); opportunistically replace the canonical dist artefact when the ScreenConnect lock releases; deferred watch items remain: configured-device probe parity across paths, parallel intra-device progress, console line ordering, AOS-Switch profile field validation.
