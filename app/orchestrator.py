@@ -90,6 +90,7 @@ def _reconstruct_pending_devices(
                 username=defaults.get("username", ""),
                 password=defaults.get("password", ""),
                 enable_password=defaults.get("enable_password"),
+                metadata={"discovered_neighbor": True},
             )
         )
     return devices
@@ -141,7 +142,10 @@ def run_recursive_collection(
             continue
         visited.add(device.name)
 
-        if device.vendor in ("auto", "unknown"):
+        discovered_neighbor = bool(device.metadata.get("discovered_neighbor"))
+        if device.vendor in ("auto", "unknown") or (
+            discovered_neighbor and _existing_identity_confidence(device) <= 0
+        ):
             if callable(on_progress):
                 on_progress(f"[verbose] {device.name}: probing identity...")
             probe_error = _probe_identity(device)
@@ -213,6 +217,7 @@ def run_recursive_collection(
                     username=defaults.get("username", ""),
                     password=defaults.get("password", ""),
                     enable_password=defaults.get("enable_password"),
+                    metadata={"discovered_neighbor": True},
                 )
             )
 

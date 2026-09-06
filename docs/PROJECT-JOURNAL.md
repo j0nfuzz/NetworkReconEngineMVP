@@ -4573,3 +4573,80 @@ Risks Resolved:
 
 Next Recommended Action:
 - Commit and push per recorded commands; Architect defines PHASE-083 field validation against build SHA-256 664CF1FC...8AC1C.
+
+---
+
+Date: 2026-09-06
+Agent: Claude
+
+Phase: PHASE-083 field validation disposition; PHASE-084 selection
+
+Changes:
+- Dispositioned the FT060920262050 field run (PHASE-082 build, provenance c290677 verified in both bundles) as PHASE-083 executed-and-closed-by-evidence; created docs/FieldEvidence/PHASE-083-20260906-2050-fieldvalidation-findings.md and docs/Phases/PHASE-083-FieldValidationPost081A.md.
+- Recorded proven capabilities (first field demonstration of the objective one hop out): credential propagation (HOSTNAME-06 authenticated and collected), intra-device progress, streaming, console capture, health penalty, provenance attribution, seed 11/11 aruba-cx collection. No proven domain reopened.
+- Root-caused the single new defect: the sequential recursive path gates the identity probe on vendor auto/unknown (PHASE-061), so classification-derived neighbours (vendor "aruba" from PHASE-072 LLDP markers) never receive platform resolution; DD-012 cannot engage; a real ArubaOS-CX neighbour (banner PL.10.11.1021, Product R8N85A 6000) ran the AOS-Switch profile, 6 of 13 commands parser-rejected including the LLDP command, discovered_neighbors empty, and downstream SW3 was never discovered (zero bundle hits for SW3; a consequence, not an independent discovery defect). The parallel path already probes every device and passes platform (PHASE-055/055A); this is a cross-path parity gap.
+- MVP assessment recorded: objective demonstrated one hop out; full multi-hop achievement blocked solely by this defect.
+- Created docs/Phases/PHASE-084-NeighborIdentityPlatformPropagationRemediation.md (app/orchestrator.py + tests only; adoption logic untouched; probe gate extended to metadata-less devices).
+
+Reason:
+- Field evidence establishes one bounded, evidenced defect with a minimal cross-path-parity fix; profile data itself is not disproven (rejections occurred on CX hardware), so no profile changes are justified (DD-013).
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; PHASE-084 closes the platform-propagation gap once implemented.
+
+Next Recommended Action:
+- Kimi implements PHASE-084; Terra reviews; on approval, build refresh (PHASE-085) then field re-validation targeting SW3 second-hop discovery (PHASE-086).
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-084-NeighborIdentityPlatformPropagationRemediation
+
+Changes:
+- app/orchestrator.py: identity-probe gate extended to classification-derived discovered neighbours lacking identity metadata (additive discovered_neighbor marker at both neighbour Device construction sites); PHASE-061A adoption logic and PHASE-081/081A progress lines unchanged.
+- tests/test_orchestrator.py: neighbour platform-propagation regression (asserts the real get_vendor_commands selects the aruba-cx profile for a probed classified neighbour), no-reprobe contract, progress-line coverage.
+- tests/conftest.py: autouse network-boundary fixture for the orchestrator SSH client so the extended gate cannot reach TEST-NET addresses in tests that do not provide their own fakes.
+- Recorded an implementer deviation: the literal "probe every metadata-less device" gate would have changed configured-device behaviour and broken the unmodified-tests criterion; the implemented gate scopes probing to the evidenced neighbour class.
+- Full suite: 346 passed, 1 pre-existing warning, runtime parity with pre-change suite.
+- Created IMPLEMENTED-PHASE-084 record.
+
+Reason:
+- FT060920262050 proved the sequential recursive path never resolved platform metadata for classified neighbours, defeating DD-012 on a real ArubaOS-CX neighbour and blocking second-hop discovery.
+
+Risks Introduced:
+- One extra identity-probe round trip per discovered neighbour; unreachable neighbours contacted twice before failure recording.
+
+Risks Resolved:
+- Platform-aware profile selection now engages for discovered neighbours on the default journey (cross-path parity with PHASE-055/055A).
+
+Next Recommended Action:
+- Terra review of PHASE-084 including the recorded deviation; on approval, PHASE-085 build refresh, then PHASE-086 field validation targeting SW3 second-hop discovery.
+
+---
+
+Date: 2026-09-06
+Agent: GPT Reviewer
+
+Phase: PHASE-084-NeighborIdentityPlatformPropagationRemediation
+
+Changes:
+- Independently inspected the diff (app/orchestrator.py +7/-1 only in production; conftest and test additions), confirmed _probe_identity adoption logic byte-identical and queueing/classification/checkpoint behaviour unchanged, and re-ran the full suite (346 passed, runtime parity).
+- Assessed and endorsed the recorded Implementer deviation (marker-scoped probe gate instead of probing every metadata-less device): it satisfies the phase intent with the smallest behaviour delta and preserves the unmodified-tests criterion the literal gate would have broken.
+- Created docs/Phases/REVIEW-PHASE-084-NeighborIdentityPlatformPropagationRemediation.md: Approved, stable checkpoint, PUSH RECOMMENDED; residual observations recorded (configured-device cross-path asymmetry, double-touch of unreachable neighbours, console line ordering).
+
+Reason:
+- Acceptance criteria met under deviation-scoped semantics with reviewer-reproduced evidence; no critical or major issues.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Sequential-path platform propagation for discovered neighbours is review-approved pending field re-validation.
+
+Next Recommended Action:
+- Commit and push per the recorded commands; Architect closes PHASE-083/084 and defines PHASE-085 build refresh followed by PHASE-086 field validation targeting SW3 second-hop discovery.

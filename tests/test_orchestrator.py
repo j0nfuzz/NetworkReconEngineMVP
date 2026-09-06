@@ -505,3 +505,93 @@ def test_no_on_progress_keeps_caller_contract(monkeypatch):
 
     assert result["successful"] == ["seed"]
     assert collector_calls == ["seed"]
+
+
+def test_classified_neighbor_without_identity_metadata_is_probed_and_gets_platform_profile(monkeypatch):
+    from app.vendor_profiles import get_vendor_commands
+
+    probed = []
+
+    def probing(device):
+        probed.append(device.name)
+        if device.name == "NX2":
+            device.vendor = "aruba"
+            device.metadata["identity"] = {
+                "vendor": "aruba",
+                "platform": "arubaos-cx",
+                "model": "R8N85A",
+                "confidence": 0.6,
+            }
+        return None
+
+    collected = []
+
+    def collector(device, progress=None):
+        collected.append(device)
+        if device.name == "seed":
+            return _make_bundle(
+                device.name,
+                device.vendor,
+                "collected",
+                [{"neighbor": "NX2", "ip": "192.0.2.2", "platform": "Aruba R8N85A", "source": "show lldp neighbor-info detail"}],
+            )
+        return _make_bundle(device.name, device.vendor, "collected", [])
+
+    monkeypatch.setattr("app.orchestrator._probe_identity", probing)
+    monkeypatch.setattr("app.orchestrator.execute_device_collection", collector)
+
+    seed = Device(name="seed", hostname="10.0.0.1", vendor="auto", username="u", password="<PASSWORD-06>")
+    result = run_recursive_collection(seed, default_credentials={"username": "u", "password": "<PASSWORD-06>"})
+
+    assert result["successful"] == ["seed", "NX2"]
+    assert probed == ["seed", "NX2"]
+    neighbour_device = collected[1]
+    assert neighbour_device.vendor == "aruba"
+    identity = neighbour_device.metadata["identity"]
+    assert identity["platform"] == "arubaos-cx"
+    commands = get_vendor_commands(neighbour_device.vendor, platform=identity["platform"])
+    assert "show module" in commands
+    assert "show trunks" not in commands
+    assert "show lldp neighbor-info detail" in commands
+
+
+def test_device_with_identity_metadata_is_not_reprobed(monkeypatch):
+    def probing(device):
+        raise AssertionError("device with identity metadata must not be re-probed")
+
+    def collector(device, progress=None):
+        return _make_bundle(device.name, device.vendor, "collected", [])
+
+    monkeypatch.setattr("app.orchestrator._probe_identity", probing)
+    monkeypatch.setattr("app.orchestrator.execute_device_collection", collector)
+
+    seed = Device(name="seed", hostname="10.0.0.1", vendor="cisco", username="u", password="<PASSWORD-06>")
+    seed.metadata["identity"] = {
+        "vendor": "cisco",
+        "platform": "cisco ios",
+        "model": "c9300",
+        "confidence": 0.7,
+    }
+    result = run_recursive_collection(seed)
+
+    assert result["successful"] == ["seed"]
+
+
+def test_progress_lines_emitted_for_classified_neighbor_probe(monkeypatch):
+    captured = []
+
+    def probing(device):
+        return None
+
+    def collector(device, progress=None):
+        return _make_bundle(device.name, device.vendor, "collected", [])
+
+    monkeypatch.setattr("app.orchestrator._probe_identity", probing)
+    monkeypatch.setattr("app.orchestrator.execute_device_collection", collector)
+
+    seed = Device(name="NX3", hostname="10.0.0.3", vendor="aruba", username="u", password="<PASSWORD-06>")
+    seed.metadata["discovered_neighbor"] = True
+    run_recursive_collection(seed, on_progress=captured.append)
+
+    assert any("NX3: probing identity" in line for line in captured)
+    assert any("NX3: identity resolved: vendor=aruba" in line for line in captured)
