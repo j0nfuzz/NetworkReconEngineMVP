@@ -3956,3 +3956,29 @@ Risks Resolved:
 
 Next Recommended Action:
 - Close the FT060920260035 finding set and all associated remediation phases (PHASE-066/067/068/069); consider a fresh portable field validation build if further field confidence is required.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-070-FieldValidationBuildRefresh-069Checkpoint
+
+Changes:
+- Generated a fresh portable build from clean HEAD b28178e using build_portable.py.
+- Verified build_manifest.json reports dirty:false and commit_sha b28178ec8c2ac613820d7273b21b1e88bb1f7dea matching the build HEAD.
+- Verified configuration hygiene in the bundle: only config/devices.yml.example and config/interactive_devices.yml.example are present; no non-example YAML files and no credential/secret/key/password/token files are included.
+- Verified extracted Start_NetworkRecon.ps1 --help and Start_NetworkRecon.cmd --help both launch successfully (exit code 0).
+- Created docs/Phases/PHASE-070-FieldValidationBuildRefresh-069Checkpoint.md and docs/Phases/IMPLEMENTED-PHASE-070-FieldValidationBuildRefresh-069Checkpoint.md.
+
+Reason:
+- With FT060920260035 fully closed, a traceable, clean-HEAD portable build is required as the refreshed field-validation checkpoint; PHASE-070 produces that build and records provenance without any source or test changes.
+
+Risks Introduced:
+- None (build/provenance activity only).
+
+Risks Resolved:
+- The field-validation bundle is now provably tied to the PHASE-069 closure commit and contains no tracked credential files.
+
+Next Recommended Action:
+- Run GPT review of PHASE-070; if approved, deploy dist/NetworkReconEngine.zip for field validation or close the build refresh as complete.
