@@ -217,6 +217,7 @@ def _run_recursive_cli(
             default_credentials=default_credentials,
             resume_state=resume_state,
             on_collected=on_collected,
+            on_device_collected=on_device_collected,
             allowed_devices=allowed_devices,
             max_concurrent=max_concurrent,
         )
@@ -456,7 +457,11 @@ def _run_cli_collection(
         topology_path = output_root / "topology.json"
         topology_path.write_text(json.dumps(topology, indent=2), encoding="utf-8")
 
-    print(f"Generated bundle manifest: {manifest_path}")
+    tee = isinstance(log_verbose, _VerboseTee)
+    if tee:
+        log_verbose(f"Generated bundle manifest: {manifest_path}")
+    else:
+        print(f"Generated bundle manifest: {manifest_path}")
     return 0
 
 

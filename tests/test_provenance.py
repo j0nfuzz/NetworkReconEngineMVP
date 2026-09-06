@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
 
 import app.provenance as provenance_module
 from app.provenance import (
+    _load_runtime_provenance,
     capture_provenance,
     compute_checksum,
     get_head_commit_sha,
@@ -151,4 +153,52 @@ def test_capture_provenance_falls_back_to_runtime_file_when_git_unavailable(
 
     result = capture_provenance()
     assert result["head_commit_sha"] == "abc123def456"
+    assert result["dirty"] == "false"
+
+
+def test_runtime_provenance_resolves_to_bundle_root_in_portable_layout(
+    monkeypatch, tmp_path
+):
+    """PHASE-076A: RUNTIME_PROVENANCE_PATH resolves to bundle root, not python/."""
+    import types
+
+    bundle_root = tmp_path / "NetworkReconEngine"
+    python_dir = bundle_root / "python"
+    python_dir.mkdir(parents=True)
+    fake_exe = python_dir / "python.exe"
+    fake_exe.write_text("", encoding="utf-8")
+
+    runtime_file = bundle_root / "build_runtime_provenance.json"
+    runtime_file.write_text(
+        json.dumps(
+            {
+                "head_commit_sha": "bundlecommit123",
+                "dirty": "false",
+                "patch": "",
+                "patch_checksum": "",
+                "excluded_paths": "config/*.yml",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    fake_sys = types.ModuleType("sys")
+    fake_sys.modules = sys.modules
+    fake_sys.executable = str(fake_exe)
+    monkeypatch.setattr(provenance_module, "sys", fake_sys)
+    monkeypatch.setattr(provenance_module, "_run_git", lambda *args: "")
+
+    expected_path = Path(fake_sys.executable).parent.parent / "build_runtime_provenance.json"
+    monkeypatch.setattr(provenance_module, "RUNTIME_PROVENANCE_PATH", expected_path)
+
+    assert _load_runtime_provenance() == {
+        "head_commit_sha": "bundlecommit123",
+        "dirty": "false",
+        "patch": "",
+        "patch_checksum": "",
+        "excluded_paths": "config/*.yml",
+    }
+
+    result = capture_provenance()
+    assert result["head_commit_sha"] == "bundlecommit123"
     assert result["dirty"] == "false"

@@ -397,6 +397,43 @@ def test_allowed_devices_set_still_bounds_discovery(monkeypatch):
     assert "SW03" not in result["bundles"]
 
 
+def test_on_device_collected_callback_fires_per_device(monkeypatch):
+    """PHASE-077A: parallel scoped path invokes per-device streaming callback."""
+    seed = Device(name="SW01", hostname="10.0.0.1", vendor="cisco")
+    neighbor_map = {
+        "SW01": [
+            {"neighbor": "SW02", "ip": "10.0.0.2", "platform": "cisco WS-C2960-24TC-L"},
+        ],
+        "SW02": [],
+    }
+
+    async def fake_collect(device: Device) -> DeviceBundle:
+        return _make_bundle(
+            device.name, device.vendor, "collected", neighbor_map.get(device.name, [])
+        )
+
+    monkeypatch.setattr("app.parallel_collector._collect_device", fake_collect)
+
+    captured = []
+
+    def on_device_collected(name, bundle, state):
+        captured.append({"name": name, "status": bundle.summary.get("status"), "state": state})
+
+    result = run_parallel_scoped_collection(
+        seed,
+        allowed_devices={"SW01", "SW02"},
+        max_concurrent=2,
+        on_device_collected=on_device_collected,
+    )
+
+    assert result["successful"] == ["SW01", "SW02"]
+    assert len(captured) == 2
+    names = [entry["name"] for entry in captured]
+    assert sorted(names) == ["SW01", "SW02"]
+    assert all(entry["status"] == "collected" for entry in captured)
+    assert all("visited" in entry["state"] for entry in captured)
+
+
 class FakeAsyncSSHConnection:
     """Minimal asyncssh stand-in for PHASE-055/055A identity-probe tests."""
 

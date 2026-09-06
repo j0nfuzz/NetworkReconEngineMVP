@@ -246,6 +246,7 @@ async def run_parallel_scoped_collection_async(
     max_devices: int = 100,
     max_concurrent: int = DEFAULT_MAX_CONCURRENT,
     on_collected: Any = None,
+    on_device_collected: Any = None,
     resume_state: Optional[Dict[str, Any]] = None,
     allowed_devices: Optional[set[str]] = None,
 ) -> Dict[str, Any]:
@@ -324,6 +325,19 @@ async def run_parallel_scoped_collection_async(
             visited.add(device.name)
             bundles[device.name] = bundle
 
+            if callable(on_device_collected):
+                on_device_collected(
+                    device.name,
+                    bundle,
+                    state_to_checkpoint(
+                        visited=visited,
+                        queued=queued,
+                        successful=successful,
+                        failed=failed,
+                        unsupported=unsupported,
+                    ),
+                )
+
             status = bundle.summary.get("status")
             if status in ("collected", "dry-run-success", "partial"):
                 successful.append(device.name)
@@ -392,6 +406,7 @@ def run_parallel_scoped_collection(
     max_devices: int = 100,
     max_concurrent: int = DEFAULT_MAX_CONCURRENT,
     on_collected: Any = None,
+    on_device_collected: Any = None,
     resume_state: Optional[Dict[str, Any]] = None,
     allowed_devices: Optional[set[str]] = None,
 ) -> Dict[str, Any]:
@@ -403,6 +418,7 @@ def run_parallel_scoped_collection(
             max_devices=max_devices,
             max_concurrent=max_concurrent,
             on_collected=on_collected,
+            on_device_collected=on_device_collected,
             resume_state=resume_state,
             allowed_devices=allowed_devices,
         )

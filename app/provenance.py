@@ -12,7 +12,9 @@ from typing import Any, Optional
 
 # Path to a static provenance file that can be shipped with portable builds.
 # Generated at build time so field execution without .git still knows its source.
-RUNTIME_PROVENANCE_PATH = Path(sys.executable).parent / "build_runtime_provenance.json"
+# In an embedded portable layout the interpreter is at <bundle_root>/python/python.exe,
+# and the builder writes the file to <bundle_root>/build_runtime_provenance.json.
+RUNTIME_PROVENANCE_PATH = Path(sys.executable).parent.parent / "build_runtime_provenance.json"
 
 
 def _load_runtime_provenance() -> dict[str, Any] | None:

@@ -3343,3 +3343,135 @@ def test_target_device_with_topology_uses_scoped_collection(monkeypatch, tmp_pat
     assert captured["seed"].name == "SW01"
     assert captured["allowed_devices"] == {"SW01", "SW02"}
 
+
+def test_scoped_cli_streams_device_bundle_before_traversal_completes(monkeypatch, tmp_path):
+    """PHASE-077A: per-device bundle and manifest are written live during scoped parallel collection."""
+    device_dict = {
+        "name": "seed-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    barrier = {"released": False}
+
+    def fake_run_parallel_scoped_collection(
+        seed_device,
+        *,
+        on_device_collected=None,
+        **kwargs,
+    ):
+        seed_bundle = DeviceBundle(
+            device_name="seed-sw",
+            device_vendor="cisco",
+            timestamp="2026-08-04T00:00:00Z",
+            summary={
+                "status": "collected",
+                "hostname": "10.0.0.1",
+                "commands_run": 0,
+                "failed_commands": [],
+            },
+            raw_outputs={},
+            failed_commands=[],
+        )
+        if callable(on_device_collected):
+            on_device_collected("seed-sw", seed_bundle, {"visited": {"seed-sw"}})
+
+        assert (tmp_path / "seed-sw" / "summary.json").exists()
+        assert (tmp_path / "bundle_manifest.json").exists()
+        assert (tmp_path / "topology.json").exists()
+        assert (tmp_path / "console.log").exists()
+        barrier["released"] = True
+
+        return {
+            "successful": ["seed-sw"],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {"seed-sw": seed_bundle},
+            "probe_errors": {},
+        }
+
+    monkeypatch.setattr(
+        "app.parallel_collector.run_parallel_scoped_collection",
+        fake_run_parallel_scoped_collection,
+    )
+    monkeypatch.setattr("app.cli.run_recursive_collection", lambda *args, **kwargs: None)
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--target-device",
+        "seed-sw",
+        "--verbose",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    assert barrier["released"] is True
+    manifest = json.loads((tmp_path / "bundle_manifest.json").read_text(encoding="utf-8"))
+    assert len(manifest["devices"]) == 1
+    console = (tmp_path / "console.log").read_text(encoding="utf-8")
+    assert "[verbose] Starting device: seed-sw" in console
+    assert "[verbose] Finished collection for seed-sw" in console
+    assert "Generated bundle manifest" in console
+
+
+def test_bundle_manifest_message_captured_in_console_log(monkeypatch, tmp_path):
+    """PHASE-077A: final manifest message is persisted to console.log in recursive mode."""
+    device_dict = {
+        "name": "seed-sw",
+        "hostname": "10.0.0.1",
+        "vendor": "cisco",
+        "username": "admin",
+        "password": "<PASSWORD-01>",
+    }
+
+    monkeypatch.setattr("app.cli.load_devices", lambda path: [device_dict])
+
+    def fake_run_recursive_collection(seed_device, *, on_device_collected=None, **kwargs):
+        seed_bundle = DeviceBundle(
+            device_name="seed-sw",
+            device_vendor="cisco",
+            timestamp="2026-08-04T00:00:00Z",
+            summary={
+                "status": "collected",
+                "hostname": "10.0.0.1",
+                "commands_run": 0,
+                "failed_commands": [],
+            },
+            raw_outputs={},
+            failed_commands=[],
+        )
+        if callable(on_device_collected):
+            on_device_collected("seed-sw", seed_bundle, {"visited": {"seed-sw"}})
+        return {
+            "successful": ["seed-sw"],
+            "failed": [],
+            "unsupported": [],
+            "bundles": {"seed-sw": seed_bundle},
+            "probe_errors": {},
+        }
+
+    monkeypatch.setattr("app.cli.run_recursive_collection", fake_run_recursive_collection)
+    monkeypatch.setattr("sys.argv", [
+        "prog",
+        "--config",
+        "config/devices.yml",
+        "--output-dir",
+        str(tmp_path),
+        "--recursive",
+        "--verbose",
+    ])
+
+    from app.cli import main
+
+    assert main() == 0
+    console = (tmp_path / "console.log").read_text(encoding="utf-8")
+    assert "Generated bundle manifest" in console
+

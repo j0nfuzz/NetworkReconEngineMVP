@@ -4287,3 +4287,33 @@ Risks Resolved:
 
 Next Recommended Action:
 - Implement PHASE-077A (higher MVP priority: closes the remaining live-observability gap for scoped runs) and PHASE-076A concurrently; both are file-disjoint.
+
+---
+
+Date: 2026-09-06
+Agent: Kimi
+
+Phase: PHASE-076A / PHASE-077A (Terra-rejected findings remediation)
+
+Changes:
+- Implemented PHASE-076A in app/provenance.py: RUNTIME_PROVENANCE_PATH now resolves to Path(sys.executable).parent.parent (bundle root) instead of Path(sys.executable).parent (python/), matching the location where build_portable.py writes build_runtime_provenance.json.
+- Implemented PHASE-077A in app/parallel_collector.py and app/cli.py: run_parallel_scoped_collection now accepts and invokes an on_device_collected callback per device; the CLI target-device path passes the existing streaming callback so device bundles, bundle_manifest.json, topology.json, and console.log update live; the final "Generated bundle manifest" message is routed through log_verbose so it is captured in console.log.
+- Added regression tests: test_runtime_provenance_resolves_to_bundle_root_in_portable_layout, test_on_device_collected_callback_fires_per_device, test_scoped_cli_streams_device_bundle_before_traversal_completes, test_bundle_manifest_message_captured_in_console_log.
+- py_compile passed for all modified production and test files.
+- Full pytest suite: 334 passed, 1 warning.
+- Built legacy embedded portable bundle; extracted run confirmed RUNTIME_PROVENANCE_PATH points to bundle root and capture_provenance() returns the embedded commit SHA instead of "unknown".
+- Created docs/Phases/IMPLEMENTED-PHASE-076A-PortableRuntimeProvenancePathFix.md and docs/Phases/IMPLEMENTED-PHASE-077A-ScopedStreamingAndConsoleCaptureCompletion.md.
+
+Reason:
+- Fixes the three Terra-rejected defects without touching classification, queueing, traversal, SSH, or orchestration logic; keeps the remediation minimal and file-disjoint.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Portable field bundles now record build identity when .git is absent.
+- Scoped/parallel collection streams artefacts and console output live.
+- Final manifest message is persisted to console.log for both recursive and scoped paths.
+
+Next Recommended Action:
+- Run Terra/GPT review of the remediated implementation and, if accepted, rebuild a fresh portable bundle from clean HEAD for field validation.
