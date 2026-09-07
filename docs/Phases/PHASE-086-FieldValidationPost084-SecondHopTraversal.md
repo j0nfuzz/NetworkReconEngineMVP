@@ -1,6 +1,19 @@
 PHASE:
 PHASE-086-FieldValidationPost084-SecondHopTraversal
 
+STATUS:
+EXECUTED AND CLOSED BY EVIDENCE (2026-09-07). Bundle field_tests/FT070920261340.zip, both device provenances head_commit_sha 462bf4366d0121b17209856059df9258bc428309 (dirty=false) — genuine PHASE-085 build attribution, directly verified. Findings: docs/FieldEvidence/PHASE-086-20260907-1340-secondhop-findings.md.
+
+RESULT SUMMARY:
+- PHASE-084 fix CONFIRMED working: HOSTNAME-06 now receives the identity probe, resolves platform=arubaos-cx, runs the correct 11-command profile, and its LLDP capture succeeds (4/4 neighbours parsed, zero failed commands).
+- SW3 (a third downstream switch) does not exist in HOSTNAME-06's LLDP evidence — its only switch-class neighbour is a LAG link back to the seed. Not a discovery/parsing/classification/queueing defect.
+- NEW defect discovered: the seed (192.168.2.241) and a neighbour named HOSTNAME-05 are the same physical device (identical hostname, identical neighbour list, identical LLDP-reported identity), but are dequeued as two distinct devices because traversal deduplicates by device.name only, with no hostname/IP identity cross-check. Dispositioned to PHASE-087-DeviceIdentityDeduplicationByHostname.
+- MVP achieved: seed -> correctly-profiled, fully-collected real second-hop device, with complete usable artefacts.
+
+MANDATORY PRE-EXECUTION GATE (satisfied by this run):
+- Before any findings document is written, extract build_provenance.json from the collected bundle and confirm head_commit_sha == 462bf4366d0121b17209856059df9258bc428309 (the PHASE-085 build) with dirty=false. If the commit SHA is c290677... (PHASE-082) or "unknown", the bundle is INVALID for this phase — do not analyze further; re-deploy using the SHA-verified dist/NetworkReconEngine-PHASE-085.zip (SHA-256 776B2527A1840C301EBB3074741EC1509FF2E50C138255365EE9F852E16BFC30) and re-collect.
+- Confirm the field-test bundle filename/timestamp corresponds to a new collection event, not a reused prior artefact.
+
 FILES:
 - None (evidence-collection phase; no source or test changes)
 - Outputs: docs/FieldEvidence/PHASE-086-<timestamp>-secondhop-findings.md

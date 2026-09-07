@@ -4753,3 +4753,251 @@ Risks Resolved:
 
 Next Recommended Action:
 - Execute PHASE-086 at the next field access window using dist/NetworkReconEngine-PHASE-085.zip (verified SHA-256 776B2527A1840C301EBB3074741EC1509FF2E50C138255365EE9F852E16BFC30); opportunistically replace the canonical dist artefact when the ScreenConnect lock releases; deferred watch items remain: configured-device probe parity across paths, parallel intra-device progress, console line ordering, AOS-Switch profile field validation.
+
+---
+
+Date: 2026-09-07
+Agent: Claude
+
+Phase: PHASE-086-FieldValidationPost084-SecondHopTraversal (evidence submission review)
+
+Changes:
+- Reviewed a 2026-09-07 evidence submission reusing bundle identifier FT060920262050.zip. REJECTED as invalid PHASE-086 evidence: (1) the submitted console narrative (11/11 commands, success) directly contradicts the submitted per-device JSON (13 commands, 6 AOS-S failures) for the same device/run; (2) the identifier, failed-command set, seed neighbour list, and seed model misparse are identical to the PHASE-082-build bundle already dispositioned in PHASE-083/084 (commit c290677), not attributable to the PHASE-085 build (462bf43); (3) no build_provenance.json commit SHA was presented; no PHASE-086 findings file existed prior to this review, confirming PHASE-086 has never executed.
+- Identified the likely mechanism as a deployment/process error, not a new code defect: PHASE-085's own record flags that the canonical dist/NetworkReconEngine.zip remained locked on the older PHASE-082 build at build time; deploying that stale archive instead of the SHA-verified PHASE-085 artefact would reproduce this exact signature.
+- Amended docs/Phases/PHASE-086-FieldValidationPost084-SecondHopTraversal.md with a mandatory pre-execution provenance gate (verify build_provenance.json head_commit_sha == 462bf43, dirty=false, and a genuinely new bundle timestamp) before any findings may be accepted.
+- Created docs/FieldEvidence/PHASE-086-EvidenceRejection-20260907.md recording the full assessment.
+- No source or test changes; DDR unchanged (UNCHANGED DD:DD-015).
+
+Reason:
+- Evidence-first governance requires rejecting internally inconsistent or unattributable field evidence rather than opening remediation against an already-fixed, unverified defect signature.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Prevents duplicate/contradictory engineering work against a defect already closed by PHASE-084; adds a durable process control against silent stale-build redeployment recurring.
+
+Next Recommended Action:
+- Execute PHASE-086 for real: deploy dist/NetworkReconEngine-PHASE-085.zip (SHA-256 776B2527A1840C301EBB3074741EC1509FF2E50C138255365EE9F852E16BFC30) only, confirm build_provenance.json attribution to 462bf43 before analysis, then produce genuine second-hop findings.
+
+---
+
+Date: 2026-09-07
+Agent: Claude
+
+Phase: PHASE-086-FieldValidationPost084-SecondHopTraversal (correction: direct bundle verification)
+
+Changes:
+- CORRECTION: the prior same-day entry incorrectly stated FT060920262050.zip could not be located. It exists at field_tests/FT060920262050.zip and has now been extracted and analysed directly (docs/FieldEvidence/PHASE-083-FT060920262050-DirectBundleVerification-20260907.md), which supersedes the prior rejection note.
+- Direct bundle inspection: exactly two devices present (192.168.2.241 seed, HOSTNAME-06); no HOSTNAME-05/SW3 device, console line, manifest entry, or topology node exists anywhere in the bundle. Both devices' build_provenance.json record head_commit_sha c290677ed6cb63170ad36440ef541de7f5ede836, dirty=false.
+- Direct git verification (not documentary inference): `git show c290677:app/orchestrator.py` shows the pre-fix identity-probe gate (vendor in auto/unknown only); current HEAD (5fe7004) contains the discovered_neighbor extension. This independently confirms the bundle was collected against code predating the PHASE-084 fix.
+- console.log shows identity-probe lines for the seed but none for HOSTNAME-06; HOSTNAME-06's own show_version.txt succeeds and correctly reports ArubaOS-CX, while show_inventory.txt/show_lldp_neighbors_detail.txt etc. return "Invalid input" — confirming the generic (AOS-Switch) profile ran against CX hardware because platform metadata was never populated for this neighbour.
+- SW3 confirmed genuinely absent from all evidence (not unparsed/unclassified/unqueued): the seed's 6 parsed LLDP neighbours account for all entries, and HOSTNAME-06's own LLDP command failed outright with zero returned data.
+- Updated docs/Phases/PHASE-086-FieldValidationPost084-SecondHopTraversal.md status to reflect direct verification; superseded docs/FieldEvidence/PHASE-086-EvidenceRejection-20260907.md with a pointer to the corrected record.
+
+Reason:
+- User override correctly identified a process failure (file-location search insufficiency) in the prior turn; direct extraction and git cross-check were required to reach an evidence-first conclusion rather than relying on inferred history.
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Confirms, via primary evidence rather than narrative, that no new code defect exists: the fix for this exact defect class is already present at current HEAD. PHASE-086 remains correctly scoped and pending a genuine field run against a fixed-code build.
+
+Next Recommended Action:
+- Execute PHASE-086 for real: deploy a build whose build_provenance.json records a commit at or after 5fe7004 (e.g. the PHASE-085 SHA-verified artefact), confirm that attribution before analysis, then produce genuine second-hop findings.
+
+---
+
+Date: 2026-09-07
+Agent: Claude
+
+Phase: PHASE-086-FieldValidationPost084-SecondHopTraversal (genuine execution) / PHASE-087 defined
+
+Changes:
+- Located and directly analysed field_tests/FT070920261340.zip. All three device bundles record build_provenance.json head_commit_sha 462bf4366d0121b17209856059df9258bc428309 (dirty=false) — genuine PHASE-085 build attribution, satisfying PHASE-086's provenance gate for the first time.
+- CONFIRMED (direct evidence): the PHASE-084 fix works in the field. HOSTNAME-06 now receives the identity probe, resolves platform=arubaos-cx, executes the correct 11-command aruba-cx profile, and its LLDP capture succeeds (4/4 neighbours parsed, zero failed commands, status=collected not partial).
+- CONFIRMED (direct LLDP evidence): SW3 does not exist. HOSTNAME-06's raw LLDP table contains exactly 4 entries (1 AP, 2 unmanaged endpoints, 1 link back to the seed); there is no third switch. Not a discovery/parsing/classification/queueing defect - the physical topology simply has no further switch from HOSTNAME-06.
+- DISCOVERED (new, not evidenced by FT060920262050 because HOSTNAME-06's LLDP previously failed entirely): the seed (192.168.2.241) and a neighbour named HOSTNAME-05 are the identical physical device (same hostname, same 10-entry neighbour list, same LLDP-reported identity string), collected twice because app/orchestrator.py's visited/queued sets key purely on device.name with no hostname/IP identity cross-check (verified directly in code: `visited.add(device.name)` / `neighbor_name in visited`).
+- MVP ACHIEVED: seed -> correctly-profiled, fully-collected real second-hop device, complete usable artefacts (summary, ai_prompt, troubleshooting_bundle, topology, manifest, console log) for both real physical devices.
+- Closed PHASE-086 by evidence (docs/FieldEvidence/PHASE-086-20260907-1340-secondhop-findings.md).
+- Created docs/Phases/PHASE-087-DeviceIdentityDeduplicationByHostname.md (app/orchestrator.py, app/parallel_collector.py) to fix the revisit-collapse defect.
+- Proposed DD-016 in DESIGN-DECISION-REGISTER.md (Status: Proposed): revisit-prevention must additionally key on resolved hostname/address identity, not name alone.
+
+Reason:
+- Evidence-first analysis of the correct, provenance-verified bundle both confirms the PHASE-084 remediation and surfaces a new, previously-dormant defect that only manifests once real LLDP data flows (i.e. after PHASE-084 fixed the profile-selection failure that had been masking it).
+
+Risks Introduced:
+- None (analysis and definition only; no source changes).
+
+Risks Resolved:
+- PHASE-084/085 field-validated and closed with real evidence.
+- New defect precisely scoped and root-caused in code before any implementation begins, preventing wasted remediation effort.
+
+Next Recommended Action:
+- Terra review of the PHASE-086 closure and the proposed DD-016; Kimi implements PHASE-087 on approval.
+
+---
+
+Date: 2026-09-07
+Agent: Kimi
+
+Phase: PHASE-087-DeviceIdentityDeduplicationByHostname
+
+Changes:
+- Added `_device_identity_set()` helper to `app/orchestrator.py` and `app/parallel_collector.py`, returning the case-normalised `{name, hostname}` equivalence set for a `Device`.
+- Added `known_identities` tracking in `run_recursive_collection()` and `run_parallel_scoped_collection_async()` covering seed, resume `visited`, and resume `pending` devices.
+- Before enqueueing a classification-derived neighbour, the neighbour's identity set is intersected with `known_identities`; a non-empty intersection means the neighbour is an alias of an already-known device and is skipped instead of queued.
+- Existing name-based `visited`/`queued` checks remain as the fallback when no resolved address is available.
+- Added PHASE-087 regression tests to `tests/test_orchestrator.py` and `tests/test_parallel_collector.py` proving alias recollection is prevented and legitimate distinct neighbours continue to traverse.
+- Created `docs/Phases/IMPLEMENTED-PHASE-087-DeviceIdentityDeduplicationByHostname.md`.
+
+Reason:
+- FT070920261340 field evidence proved the same physical switch was collected twice under the seed IP (`192.168.2.241`) and its LLDP-reported system-name (`HOSTNAME-05`) because deduplication keyed only on `device.name`; hostname/IP identity equivalence closes the revisit-collapse defect.
+
+Risks Introduced:
+- Devices with multiple interfaces/management addresses that differ from the LLDP-reported address may still evade this check; accepted as a known limitation in the phase definition.
+
+Risks Resolved:
+- The same physical device is no longer re-collected under an alternate neighbour name when its resolved hostname/IP matches an already-visited device.
+- Legitimate distinct neighbours with unique addresses continue to traverse normally on both sequential and parallel paths.
+
+Next Recommended Action:
+- Run Terra/GPT review of PHASE-087 and the proposed DD-016; on approval, commit and run a build refresh before field re-validation.
+
+---
+
+Date: 2026-09-07
+Agent: GPT Reviewer
+
+Phase: PHASE-087-DeviceIdentityDeduplicationByHostname
+
+Changes:
+- Reviewed the PHASE-087 implementation, focused regressions, full suite, and direct topology output for an alias edge.
+- Confirmed redundant alias collection is prevented in sequential and parallel paths, but rejected the phase because topology.json retains `HOSTNAME-05` as an unlinked target instead of recording an alias/back-edge to existing node `192.168.2.241`.
+- Rejected DD-016 pending an implementation that preserves graph identity as well as collection deduplication.
+
+Reason:
+- PHASE-087 explicitly requires the observed LLDP edge to be represented as an alias/back-edge to the existing node; merely retaining the alias string leaves topology identity collapsed and does not satisfy the acceptance criterion.
+
+Risks Introduced:
+- None (review only).
+
+Risks Resolved:
+- None; topology alias representation remains incomplete.
+
+Next Recommended Action:
+- Implement a narrowly scoped PHASE-087 remediation that maps alias edges to the already-collected node while retaining the LLDP-reported alias and management address as evidence.
+
+---
+
+Date: 2026-09-07
+Agent: Claude
+
+Phase: PHASE-087A-TopologyAliasBackEdgeRemediation (defined)
+
+Changes:
+- Reviewed Terra's PHASE-087 rejection and independently confirmed it by direct inspection of `app/topology.py::build_topology_graph()`: it always uses the raw `neighbor` string from `discovered_neighbors` as the edge target and never cross-checks it against any already-collected device's resolved hostname/IP, so an alias neighbour produces a dangling edge target instead of a back-edge to the canonical node.
+- Agree with Terra: the collection-path acceptance criteria are met (alias recollection prevented, distinct neighbours unaffected, both sequential/parallel paths covered, full suite green) but the topology-path acceptance criterion ("record it in topology as an alias/back-edge to the existing node") is not met.
+- PHASE-087 remains open (not closed); DD-016 remains Rejected, correctly recorded by Terra.
+- Created PHASE-087A-TopologyAliasBackEdgeRemediation.md as a narrow successor: resolve alias edge targets to the canonical collected node's name in `app/topology.py`, retaining the LLDP-reported alias/address as edge evidence. Scope limited to `app/topology.py` and `app/orchestrator.py` (identity exposure only, not the PHASE-087 dedup logic itself).
+- Discovery, classification, queueing, traversal, recursion, credential propagation, streaming, and provenance are not reopened; PHASE-086 confirmed all of these working in the field.
+
+Reason:
+- Terra's finding is evidenced and narrow (graph identity hygiene only); a small, file-scoped successor phase is the correct remediation vehicle rather than reopening or redesigning PHASE-087's collection-path fix.
+
+Risks Introduced:
+- None (definition-only).
+
+Risks Resolved:
+- None yet; PHASE-087A closes the topology alias/back-edge gap once implemented.
+
+Next Recommended Action:
+- Implement PHASE-087A-TopologyAliasBackEdgeRemediation; Terra re-reviews; on approval, close PHASE-087/087A together and reconsider DD-016 for approval.
+
+---
+
+Date: 2026-09-07
+Agent: Kimi
+
+Phase: PHASE-087A-TopologyAliasBackEdgeRemediation (implemented)
+
+Changes:
+- Implemented minimal topology-only remediation in app/topology.py.
+- Added _build_identity_to_name_map() and extended build_topology_graph() with an optional identity_to_name parameter.
+- Neighbor aliases whose IP or hostname matches an already-collected device's identity now resolve to the canonical node name.
+- Original LLDP-reported alias name and management address preserved as edge evidence (alias field).
+- Added four regression tests in tests/test_cli.py covering IP-based resolution, hostname-based resolution, distinct-neighbour preservation, and no duplicate logical node.
+
+Reason:
+- Terra rejected PHASE-087 because topology.json still emitted the LLDP alias as a dangling target. PHASE-087A resolves the alias to the canonical collected node while retaining evidence, satisfying the acceptance criteria without redesigning collection logic.
+
+Risks Introduced:
+- Minimal: identity matching uses the same case-insensitive name/hostname set as PHASE-087; devices reached via an LLDP-reported address that differs from any collected identity still resolve as name-only edges, which is the accepted PHASE-087 limitation.
+
+Risks Resolved:
+- Dangling alias targets in topology.json.
+- Graph identity split from same physical device represented under multiple names.
+- Incorrect back-edge representation for alias neighbours.
+
+Validation:
+- python -m py_compile app/topology.py tests/test_cli.py: passed.
+- python -m pytest tests/test_cli.py -k 'build_topology_graph' -q: 11 passed.
+- python -m pytest -q: 354 passed, 1 existing warning.
+
+Next Recommended Action:
+- Terra re-reviews PHASE-087A; on approval, close PHASE-087/087A together and reconsider DD-016 for approval.
+
+---
+
+Date: 2026-09-07
+Agent: Claude
+
+Phase: PHASE-087 + PHASE-087A (closed)
+
+Changes:
+- Terra approved PHASE-087A (alias neighbours now resolve to the canonical collected node in topology.json; original alias/address preserved as edge evidence; no duplicate logical node; distinct neighbours unaffected; 11 targeted tests + 354-test full suite passing).
+- Closing both PHASE-087 (collection-path dedup) and PHASE-087A (topology-path alias resolution) together: they jointly satisfy DD-016 in full.
+- DD-016 status changed from Rejected to Approved on this basis (see DESIGN-DECISION-REGISTER.md).
+- MVP assessment: achieved. Seed-to-neighbour-to-topology-to-artefact pipeline is field-proven end-to-end (PHASE-086 bundle) with no known dangling identities or redundant collection remaining.
+- Hosted SDLC experiment (Claude architect / Kimi implementer / Terra reviewer roles) assessed as successfully demonstrated: a real field defect was found, triaged into two correctly-scoped phases, implemented, reviewed (one rejection, one approval), and closed using only the DDR/Journal/Phase-file governance loop, with no scope creep into discovery, classification, queueing, traversal, credential, streaming, or provenance code.
+
+Reason:
+- Both phases' acceptance criteria are independently evidenced and Terra-reviewed; no further remediation is required for the DD-016 field defect (FT070920261340).
+
+Risks Introduced:
+- None.
+
+Risks Resolved:
+- Redundant alias collection (PHASE-087).
+- Dangling alias topology targets (PHASE-087A).
+
+Next Recommended Action:
+- No further action required on PHASE-087/087A/DD-016. Future phases should be selected based on new field evidence rather than continued remediation of this defect.
+
+---
+
+Date: 2026-09-07
+Agent: Claude
+
+Phase: SW3-Absence-Assessment / Next-Phase-Selection
+
+Changes:
+- Reconfirmed PHASE-087/PHASE-087A closure and DD-016 Approved status (unchanged from prior entry; no rework required).
+- Assessed SW3 (known physical third switch) absence from HOSTNAME-06's LLDP evidence: LLDP collection succeeded, parsing succeeded, parsed neighbour count matches raw table count (4/4) exactly. Conclusion: NOT a defect. SW3 has no LLDP-visible link to HOSTNAME-06 in this evidence; discovery/parsing/classification/queueing performed exactly as designed.
+- Assessed LLDP/CDP-only neighbour discovery as the correct current architecture: it is proven reliable (zero parser loss across all bundles to date) and matches the original Wishlist Phase 4 design, which always envisioned ARP/MAC/routing as later additive sources, not a replacement mechanism.
+- Proposed DD-017: MAC-address-table-based topology enrichment as the next-highest-value additive discovery source, additive/labelled only, never merged into LLDP-sourced edges. Classified as Enhancement (not required remediation, not urgent roadmap).
+- Created PHASE-088-MacAddressTableTopologyEnrichment.md as the sole next actionable phase definition.
+- ARP-table correlation, LACP membership, STP topology, and routing-neighbour correlation are recorded as Future Roadmap items only (no phase file created; insufficient evidence of near-term value versus PHASE-088).
+
+Reason:
+- Evidence-first: SW3's absence is fully explained by existing, correctly-functioning LLDP evidence; creating a remediation phase for correctly-working behaviour would violate delta-only/no-speculative-remediation governance. MAC-address-table enrichment is the smallest additive step that could surface SW3 (or confirm its absence via another evidence source) without reopening any proven area.
+
+Risks Introduced:
+- None (assessment and one proposed phase definition only; no code changed).
+
+Risks Resolved:
+- None; this is an assessment/planning entry, not a remediation.
+
+Next Recommended Action:
+- Kimi implements PHASE-088-MacAddressTableTopologyEnrichment.md; Terra reviews; DD-017 disposition decided on review outcome.

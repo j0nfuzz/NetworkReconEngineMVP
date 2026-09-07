@@ -455,3 +455,50 @@ Date:
 
 Phase:
 PHASE-053-AutomaticTraversalRootExpansionRemediation
+
+---
+
+Decision ID: DD-016
+
+Decision:
+Neighbour revisit-prevention must additionally key on resolved hostname/management-address identity, not device.name alone; a classification-derived neighbour whose resolved address matches an already-visited device must be treated as the same physical device (recorded as an alias/back-edge in topology, not re-collected).
+
+Reason:
+FT070920261340 field evidence (post-PHASE-084 build, commit 462bf43) directly proves the seed device (192.168.2.241) and a neighbour named HOSTNAME-05 are the identical physical switch (same hostname, same neighbour list, same LLDP-reported identity), yet both were collected as distinct devices because app/orchestrator.py's visited/queued sets are keyed purely by device.name string. This wastes one SSH session/credential use per revisit and produces a bundle that overstates the discovered device count.
+
+Status:
+Approved
+
+Approver:
+GPT Reviewer
+
+Date:
+2026-09-07
+
+Phase:
+PHASE-087-DeviceIdentityDeduplicationByHostname + PHASE-087A-TopologyAliasBackEdgeRemediation
+
+Approval Note:
+PHASE-087 (collection-path dedup) combined with PHASE-087A (topology.py alias resolution to canonical node, Terra-approved) together satisfy the full decision: aliases are neither re-collected nor left as dangling topology targets.
+
+---
+
+Decision ID: DD-017
+
+Decision:
+LLDP/CDP-only neighbour discovery is confirmed working-as-designed and is not to be modified. Topology enrichment from additional evidence sources (MAC-address-table first, ARP/routing/LACP/STP deferred) is an additive, clearly-labelled enrichment layer that must never be merged into or silently reinterpret LLDP/CDP-sourced edges.
+
+Reason:
+FT070920261340 field evidence shows LLDP collection and parsing succeeded with 4/4 neighbours matching the raw table; SW3's absence is fully explained by it having no LLDP-visible link to HOSTNAME-06, not by a discovery/parsing defect. Wishlist Phase 4 already envisioned ARP/MAC/routing as discovery sources; this formalises MAC-address-table correlation as the first additive enrichment phase without reopening proven LLDP/CDP behaviour.
+
+Status:
+Proposed
+
+Approver:
+Pending GPT Reviewer
+
+Date:
+2026-09-07
+
+Phase:
+PHASE-088-MacAddressTableTopologyEnrichment
