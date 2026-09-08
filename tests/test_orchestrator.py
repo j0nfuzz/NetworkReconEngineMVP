@@ -595,3 +595,57 @@ def test_progress_lines_emitted_for_classified_neighbor_probe(monkeypatch):
 
     assert any("NX3: probing identity" in line for line in captured)
     assert any("NX3: identity resolved: vendor=aruba" in line for line in captured)
+
+
+def test_alias_neighbor_matching_visited_ip_is_not_recollection(monkeypatch):
+    """PHASE-087: a neighbour whose IP matches an already-visited device's hostname is not re-collected."""
+    seed = Device(name="192.168.2.241", hostname="192.168.2.241", vendor="aruba")
+    responses = {
+        "192.168.2.241": _make_bundle(
+            "192.168.2.241",
+            "aruba",
+            "collected",
+            [
+                {"neighbor": "HOSTNAME-06", "ip": "192.168.2.242", "platform": "Aruba R8N85A"},
+                {"neighbor": "HOSTNAME-05", "ip": "192.168.2.241", "platform": "Aruba R8N85A"},
+            ],
+        ),
+        "HOSTNAME-06": _make_bundle(
+            "HOSTNAME-06",
+            "aruba",
+            "collected",
+            [{"neighbor": "HOSTNAME-05", "ip": "192.168.2.241", "platform": "Aruba R8N85A"}],
+        ),
+    }
+    collector = _FakeCollector(responses)
+    monkeypatch.setattr("app.orchestrator.execute_device_collection", collector)
+    monkeypatch.setattr("app.orchestrator._probe_identity", lambda device: None)
+
+    result = run_recursive_collection(seed)
+    assert result["successful"] == ["192.168.2.241", "HOSTNAME-06"]
+    assert "HOSTNAME-05" not in result["bundles"]
+    assert not any(d.name == "HOSTNAME-05" for d in collector.calls)
+
+
+def test_distinct_neighbors_with_unique_addresses_still_traversed(monkeypatch):
+    """PHASE-087: genuinely distinct neighbours (different resolved addresses) are unaffected."""
+    seed = Device(name="SW01", hostname="10.0.0.1", vendor="cisco")
+    responses = {
+        "SW01": _make_bundle(
+            "SW01",
+            "cisco",
+            "collected",
+            [
+                {"neighbor": "SW02", "ip": "10.0.0.2", "platform": "cisco WS-C2960-24TC-L"},
+                {"neighbor": "SW03", "ip": "10.0.0.3", "platform": "cisco WS-C2960-24TC-L"},
+            ],
+        ),
+        "SW02": _make_bundle("SW02", "cisco", "collected", []),
+        "SW03": _make_bundle("SW03", "cisco", "collected", []),
+    }
+    collector = _FakeCollector(responses)
+    monkeypatch.setattr("app.orchestrator.execute_device_collection", collector)
+
+    result = run_recursive_collection(seed)
+    assert result["successful"] == ["SW01", "SW02", "SW03"]
+    assert [d.name for d in collector.calls] == ["SW01", "SW02", "SW03"]

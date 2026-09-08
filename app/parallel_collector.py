@@ -19,6 +19,19 @@ DEFAULT_MAX_CONCURRENT = 5
 MAX_CONCURRENT_CEILING = 10
 
 
+def _device_identity_set(device: Device) -> set[str]:
+    """Return the identity-equivalence set for a device (name + hostname).
+
+    Hostnames and names are normalised to lower-case because network identities
+    are case-insensitive; this lets the same physical box be recognised whether
+    it is reached by LLDP-reported system-name or management-address.
+    """
+    identities: set[str] = {device.name.lower()}
+    if device.hostname:
+        identities.add(device.hostname.lower())
+    return identities
+
+
 def _build_summary(device: Device) -> Dict[str, Any]:
     summary: Dict[str, Any] = {
         "device": device.name,
@@ -274,8 +287,12 @@ async def run_parallel_scoped_collection_async(
     queue: deque[Device] = deque(pending_devices)
     if seed_device.name not in visited:
         queue.append(seed_device)
+
+    known_identities: set[str] = set()
+    known_identities.update({name.lower() for name in visited})
     for device in queue:
         queued.add(device.name)
+        known_identities.update(_device_identity_set(device))
 
     effective_max_concurrent = min(max(max_concurrent, 1), MAX_CONCURRENT_CEILING)
     semaphore = asyncio.Semaphore(effective_max_concurrent)
@@ -367,20 +384,24 @@ async def run_parallel_scoped_collection_async(
                         failed.append(neighbor_name)
                     continue
 
-                queued.add(neighbor_name)
-                next_queue.append(
-                    Device(
-                        name=neighbor_name,
-                        hostname=ip,
-                        vendor=classification,
-                        username=defaults.get("username", ""),
-                        password=defaults.get("password", ""),
-                        enable_password=defaults.get("enable_password"),
-                    )
+                neighbor_device = Device(
+                    name=neighbor_name,
+                    hostname=ip,
+                    vendor=classification,
+                    username=defaults.get("username", ""),
+                    password=defaults.get("password", ""),
+                    enable_password=defaults.get("enable_password"),
                 )
+                if _device_identity_set(neighbor_device) & known_identities:
+                    continue
+
+                queued.add(neighbor_name)
+                known_identities.update(_device_identity_set(neighbor_device))
+                next_queue.append(neighbor_device)
 
         for device in sorted(next_queue, key=lambda d: d.name):
             queue.append(device)
+            known_identities.update(_device_identity_set(device))
 
         _emit_checkpoint()
 

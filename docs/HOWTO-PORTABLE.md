@@ -1,8 +1,16 @@
 # Portable Windows Setup and Recovery
 
+## Experiment closure status — PHASE-090
+
+This is a working-prototype operations guide, not a production-readiness claim. Start with [DEMONSTRATION.md](../DEMONSTRATION.md) for the verified source workflow and [RELEASE_NOTES.md](../RELEASE_NOTES.md) for the prepared release. Existing local archives predate the reviewed closure implementation; no new closure package or tag has been created.
+
+Recursive discovery is enabled by default. `--recursive` is retained for compatibility; `--no-recurse` selects flat collection. A configured `--target-device` does not require an existing topology file: without one it expands through discovered neighbours; with one, it applies the requested topology scope. Concurrency limits simultaneous SSH sessions, not total estate coverage.
+
+The Python CLI's prompt-based launch creates a temporary inventory with default credentials for neighbours. The separate PowerShell bootstrap currently writes `config/interactive_devices.yml` without a default credentials block and leaves that runtime file in place. For the demonstrated recursive workflow, use the direct Python CLI or the explicit default-credentials inventory in the demonstration. Treat runtime YAML and generated output as sensitive.
+
 This guide explains how to run Network Device Diagnostics from a copied, extracted, or newly cloned repository on a Windows workstation. It is intended for technicians who do not need to manage Python virtual environments manually.
 
-For an entirely Python-free workflow, build or download the self-contained executable described in the [Packaged executable](#packaged-executable) section.
+For a workflow requiring no system Python installation, see the [embedded-runtime bundle](#packaged-embedded-runtime-bundle). Building it still requires a working development environment; the bundle includes Python.
 
 ## Before You Start
 

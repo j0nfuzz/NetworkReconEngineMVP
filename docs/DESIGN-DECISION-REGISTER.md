@@ -486,10 +486,10 @@ PHASE-087 (collection-path dedup) combined with PHASE-087A (topology.py alias re
 Decision ID: DD-017
 
 Decision:
-LLDP/CDP-only neighbour discovery is confirmed working-as-designed and is not to be modified. Topology enrichment from additional evidence sources (MAC-address-table first, ARP/routing/LACP/STP deferred) is an additive, clearly-labelled enrichment layer that must never be merged into or silently reinterpret LLDP/CDP-sourced edges.
+Preserve LLDP/CDP discovery. Future enrichment must retain source and uncertainty separately; MAC/OUI evidence alone must neither establish physical adjacency nor trigger traversal.
 
 Reason:
-FT070920261340 field evidence shows LLDP collection and parsing succeeded with 4/4 neighbours matching the raw table; SW3's absence is fully explained by it having no LLDP-visible link to HOSTNAME-06, not by a discovery/parsing defect. Wishlist Phase 4 already envisioned ARP/MAC/routing as discovery sources; this formalises MAC-address-table correlation as the first additive enrichment phase without reopening proven LLDP/CDP behaviour.
+SW3 visibility is unresolved; broader discovery is envisioned by Wishlist Phase 4. Assess existing evidence before implementing enrichment.
 
 Status:
 Proposed
@@ -498,7 +498,7 @@ Approver:
 Pending GPT Reviewer
 
 Date:
-2026-09-07
+2026-09-08
 
 Phase:
-PHASE-088-MacAddressTableTopologyEnrichment
+PHASE-089-SW3DiscoveryEvidenceAssessment; PHASE-088-MacAddressTableTopologyEnrichment deferred

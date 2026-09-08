@@ -8,6 +8,7 @@ build/
 # Virtual environments
 .venv/
 .venv-legacy/
+.venv-demo/
 venv/
 
 # Tooling / caches
@@ -37,6 +38,7 @@ config/*.yml
 !config/*.yml.example
 
 # Packaged distribution artefacts
+dist/
 *.zip
 
 # Local pytest basetemp (see pytest.ini addopts)

@@ -5001,3 +5001,86 @@ Risks Resolved:
 
 Next Recommended Action:
 - Kimi implements PHASE-088-MacAddressTableTopologyEnrichment.md; Terra reviews; DD-017 disposition decided on review outcome.
+
+---
+
+Date: 2026-09-08
+Agent: Claude (architect role; executed by Codex)
+
+Phase: PHASE-087/087A closure qualification; PHASE-089-SW3DiscoveryEvidenceAssessment (defined)
+
+Changes:
+- Corrected the existing closure assessment's evidence scope: the verified archive predates PHASE-087/087A; the fixes are supported by Terra-reviewed regressions/reproduction, not a supplied post-fix live archive. Existing joint closure, scoped MVP acceptance and DD-016 Approved remain valid.
+- Qualified the SW3 absence claim: the downstream capture has 4/4 LLDP records, but no confirmed SW3 identity. An additional seed-advertised switch is visible in raw/parsed/topology evidence; the operator confirmed today that it is a different device. Anonymous advertisements and other table entries cannot be mapped to SW3 without corroborating identity.
+- Corrected the previous architecture rationale: Wishlist Phase 4 explicitly includes ARP/routing/vendor topology; it does not explicitly list MAC tables. Current extraction is LLDP/CDP; the observed profile already captures MAC/ARP/routes/interfaces.
+- Revised proposed DD-017 to remove an unevidenced cause for SW3 absence and permanent discovery restriction; future enrichment must retain source/uncertainty and cannot infer adjacency or traversal from MAC/OUI alone. Status remains Proposed, pending reviewer approval.
+- Deferred and narrowed the existing unimplemented PHASE-088 proposal. Defined PHASE-089 as the single next activity: reconcile SW3 identity, attachment and evidence before selecting a production enhancement. Classification: Enhancement evidence prerequisite; PHASE-088 and other correlation capabilities: Future roadmap.
+
+Reason:
+- Direct archive inspection and operator clarification support an evidence-assessment step, not speculative product remediation. Current behaviour does not promise complete physical inventory.
+
+Risks Introduced:
+- None in production; documentation and phase definitions only. PHASE-089 may require operator identity/access and can conclude unresolved.
+
+Risks Resolved:
+- Removed overstatement of post-fix field proof, an unsupported explanation of missing LLDP visibility, and the proposed MAC/OUI-to-physical-edge inference. SW3 visibility itself remains unresolved.
+
+Next Recommended Action:
+- Execute PHASE-089 only (one selected workstream; maximum five). No additional product remediation is required on current evidence. Use its findings to activate, defer or stop PHASE-088; do not reopen approved phases or automatically start roadmap work.
+
+---
+
+Date: 2026-09-08
+Agent: Astra (architect, technical writer, release manager and repository curator; executed by Codex)
+Phase: PHASE-090 — Experiment Closure and Continuation Handover
+
+Changes:
+- Created the five closure deliverables: corrected README, EXPERIMENT-REPORT, DEMONSTRATION, EXPERIMENT-CLOSURE and CONTINUATION-HANDOVER. Added prepared RELEASE_NOTES and qualified the portable guide.
+- Declared the engineering experiment complete and the scoped MVP achieved as a working prototype; routine production readiness remains unclaimed. Preserved PHASE-087/087A joint closure and DD-016 Approved; DD-017 remains Proposed.
+- Separated pre-fix live evidence from approved post-fix regression/reproduction evidence; no post-PHASE-087A live archive is claimed. Corrected recursion/target defaults against code.
+- Moved PHASE-089 and PHASE-088 to the continuation backlog at their existing paths. This supersedes the prior instruction to execute PHASE-089 next here. Future work is Research, Enhancement or Roadmap, not required remediation.
+- Recorded current HEAD plus existing uncommitted source/test changes and a content fingerprint. Recommended annotated tag experiment-complete-2026-09 after restricted baseline reconciliation; did not tag incomplete HEAD or commit pre-existing implementation.
+- Reviewed reachable history, documentation and selected archives for obvious sensitive-data exposures. Findings are sanitised in EXPERIMENT-CLOSURE; public publication is not cleared. No history rewrite or redistribution performed.
+
+Reason:
+- User authorised a defensible endpoint and separate continuation path, not further product remediation. New readers need a self-contained, reproducible account and accurate evidence boundaries.
+
+Validation:
+- Current full suite: 354 passed, one established warning, using bundled Python and existing dependencies with a fresh test directory after local interpreter/temp-directory issues.
+- Documented offline packaging and synthetic alias topology reproduction verified; local links and unchanged source/test fingerprint checked. No new live field collection or portable build.
+
+Risks Introduced:
+- None in application behaviour; PHASE-090 changes documentation only.
+
+Risks Resolved:
+- Removed misleading entry-point defaults, unsupported post-fix field claims and active-phase ambiguity. Historical sensitive data, immutable source capture and production validation remain explicitly outstanding.
+
+Next Recommended Action:
+- Custodian preserves/reconciles the restricted reviewed baseline, verifies and annotates the recommended tag, then archives the experiment repository. If continuation is selected, establish a sanitised separate repository and assign its maintainer; activate no further product work here.
+
+---
+
+Date: 2026-09-08
+Agent: Codex
+Phase: PHASE-090 — authorised source baseline commit and origin push
+
+Changes:
+- User explicitly authorised reviewing Git/ignore rules, adding the outstanding experiment files, committing with message "Experiment Complete 2026-09-08", and pushing to origin.
+- Confirmed origin is the existing private `<USERNAME>`/NetworkReconEngine repository and refreshed its remote refs.
+- Reviewed repository-wide ignore rules and the nested pytest-cache rule. Added .venv-demo/ and dist/ coverage; raw field archives, live configuration, generated outputs and ZIPs remain ignored.
+- Prepared the existing reviewed PHASE-087/087A source/tests, supporting findings/phase records and closure deliverables for one baseline commit. Updated the closure documents to distinguish initial uncommitted assessment from this authorised commit.
+
+Reason:
+- Capture the complete reviewed experiment baseline in Git and synchronise the existing origin at the user's request.
+
+Validation:
+- Application/test content fingerprint remains identical to the closure baseline already validated by 354 passing tests and one established warning. Reviewed changed-file selection, ignore behaviour and whitespace before staging.
+
+Risks Introduced:
+- None in runtime behaviour. The repository remains private; this action does not grant public publication clearance.
+
+Risks Resolved:
+- This commit captures the previously uncommitted reviewed implementation and its supporting documents. No tag, public release, history rewrite or hosted archival is included.
+
+Next Recommended Action:
+- Verify the closure commit matches origin/master after push. Annotated tagging, controlled archival and any continuation remain separate actions.

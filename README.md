@@ -1,321 +1,90 @@
 # Network Recon Engine
 
-A read-only SSH diagnostics tool for collecting device telemetry and packaging it into an AI-ready bundle.
+**Completed AI-assisted engineering experiment; working prototype.**
+PHASE-090 closes the experiment on 8 September 2026. Routine production deployment readiness is not claimed. Development is frozen in this experiment workspace; the reviewed implementation is captured with the closure documentation in the commit titled `Experiment Complete 2026-09-08`. Release tagging and hosting-side archival remain separate preparation tasks.
 
-This project is designed to be safe and operationally useful:
+## Start here
 
-- no configuration writes are attempted
-- only diagnostic commands are allowed
-- output is grouped into a per-device bundle for review or AI analysis
-- it supports interactive startup and direct CLI execution
+| Read | Purpose |
+|---|---|
+| [Demonstration](DEMONSTRATION.md) | Reproduce offline behaviour, then repeat the collection workflow in an authorised lab |
+| [Experiment report](EXPERIMENT-REPORT.md) | Objective, roles, evidence, findings and lessons |
+| [Experiment closure](EXPERIMENT-CLOSURE.md) | Exact baseline, validation, limitations and publication review |
+| [Continuation handover](CONTINUATION-HANDOVER.md) | Future repository, backlog and ownership |
+| [Release notes](RELEASE_NOTES.md) | Prepared experiment release and tag recommendation |
 
-## Features
+These documents are sufficient to understand the outcome without reading the phase history.
 
-- YAML-based device inventory
-- interactive PowerShell bootstrap for host, username, port, and password
-- SSH connectivity via Paramiko
-- vendor-aware command profiles for Cisco, Juniper, Aruba, Arista, and generic devices
-- strict read-only command enforcement
-- legacy SSH KEX fallback handling for older network appliances
-- raw command output capture
-- bundle generation with summary and AI prompt output
-- ZIP packaging for each device bundle
-- dry-run validation mode
-- verbose SSH collection diagnostics
-- recursive collection with topology-aware scoping
-- checkpoint resume support
-- bounded parallel collection for scoped runs
+## The experiment
 
-## Safety model
+The question was whether AI agents operating as **Architect, Implementer and Reviewer**, under human direction and a small documentary governance process, could incrementally deliver and validate a useful network reconnaissance prototype.
 
-This tool is intentionally read-only.
+The Architect defined bounded changes and acceptance criteria. The Implementer changed code and supplied regression evidence. The Reviewer checked requirements and outputs and could reject an implementation. The project standard originally named Claude / Kimi / GPT for these roles; later records identify Terra as reviewer. Those are recorded role assignments, not an independently controlled comparison of models.
 
-- no `configure`, `copy`, `write`, or change commands are permitted
-- vendor profiles only include safe show/get style commands
-- the app validates the command set before collection starts
-- all output is focused on diagnostics, troubleshooting, and AI-assisted analysis
+A human selected objectives, supplied access and field captures, ran deployments, clarified the real network, challenged incorrect evidence attribution and authorised closure. Runtime collection and classification are deterministic Python logic; an LLM is not required to decide which neighbour to collect. Generated prompts support subsequent human or AI analysis.
 
-## Quick start
+Evidence drove iteration: a field capture exposed duplicate collection of a switch under an alias. PHASE-087 stopped the duplicate but failed review because its topology edge still pointed at the alias. PHASE-087A resolved the edge to the collected node and passed review. The combined phases remain closed and DD-016 remains Approved.
 
-### Option 1: interactive launch (no inventory file required)
+## Capability and evidence
 
-The CLI can prompt for everything needed for a single-device collection. Omit `--config` and enter the target details when asked:
+| Implemented in the working tree | Field demonstrated | Not yet validated |
+|---|---|---|
+| Read-only command filtering, SSH collection, vendor/platform profiles | Two distinct Aruba-CX switches produced usable evidence packages; downstream platform selection used the correct 11-command profile | Every supported vendor/version, every SSH policy or failure mode |
+| LLDP/CDP parsing, classification and neighbour traversal; recursion on by default | Seed → supported neighbour → collection → evidence bundle | Complete physical inventory, the unresolved additional rack switch, deeper live traversal |
+| Default credential propagation, progress callbacks, incremental raw files and bundle updates | Prior field records support these behaviours; the archive contains console and per-device evidence | Exact timing of every update cannot be established from a static ZIP |
+| Identity deduplication on sequential/parallel paths and canonical topology alias edges | The supplied field archive demonstrates the original defect | No supplied post-PHASE-087A live archive; fixes are supported by approved reproduction and regression tests |
+| Checkpoints, bounded concurrent target collection, health summaries, provenance, portable packaging | Portable provenance is verified for the PHASE-085 field build | Production scale, long-duration reliability and a newly packaged closure build |
 
-```powershell
-.\.venv\Scripts\python.exe -m app.cli --output-dir output --verbose
-```
+Current closure validation: **354 tests passed, one established profile-fallback warning**. Passing mocked regressions is distinct from live device validation.
 
-You will be prompted for:
+## Run from source
 
-- Hostname or IP
-- Username
-- Password (hidden)
-- SSH port (defaults to `22`)
-- Vendor (defaults to `auto`)
-
-The CLI writes the entered details to a temporary runtime YAML in the system temp directory, then runs the normal collection path and deletes the file. The prompted credentials are also written to the runtime inventory's `default:` block, so during recursive collection discovered neighbours reuse them instead of receiving empty credentials. Existing `--config` workflows are unchanged; config-file users should set a `default:` credentials block for recursive runs.
-
-The packaged executable supports the same prompt-based launch:
+Use a working Python 3.12 installation on Windows and a fresh environment:
 
 ```powershell
-.\NetworkDeviceDiagnostics.exe --output-dir output --verbose
+py -3.12 -m venv .venv-demo
+.\.venv-demo\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv-demo\Scripts\python.exe -m app.cli --output-dir output\lab-run --verbose
 ```
 
-### Option 2: interactive bootstrap (PowerShell)
+The last command prompts for host, username, hidden password, port and vendor, and starts a live recursive run. Only use reachable devices within an authorised lab. See [DEMONSTRATION.md](DEMONSTRATION.md) for a network-free first run and explicit lab acceptance checks.
 
-From the project root:
+The Python CLI's interactive inventory is temporary and supplies default credentials to discovered neighbours. With YAML, use a `default:` credentials block and exact `${ENV_VAR}` references. Per-device credentials override defaults. A missing environment variable is rejected before collection.
 
-```powershell
-.\interactive_bootstrap.ps1
-```
+The separate PowerShell bootstrap supports environment recovery and SSH-profile selection, but its current generated inventory has no default credentials block. Use the direct Python CLI or an explicit inventory for the demonstrated recursive workflow.
 
-This will:
+## Current CLI behaviour
 
-- prompt for the switch/router host/IP, username, port, and password
-- prompt for timeout, host-key policy (`auto`/`reject`/`warning`), and an optional `known_hosts` file
-- **auto-detect** the SSH profile by probing the device (modern vs legacy/SHA-1), so operators don't need to know in advance
-- create the local virtual environment if needed (`.venv` for modern, `.venv-legacy` for legacy)
-- install dependencies unless `-SkipInstall` is used
-- build a temporary config and run the collection
+| Invocation | Behaviour |
+|---|---|
+| No recursion flags | First configured device is the seed; recursive discovery is enabled |
+| `--recursive` | Backward-compatible alias; recursion is already the default |
+| `--no-recurse` | Flat collection of configured devices |
+| `--target-device NAME` | Selects an exact configured device name as the root and uses the parallel collector |
+| Target with existing `topology.json` in the output directory | Limits collection to the topology scope; `--scope-depth` defaults to 1 |
+| Target without existing topology | Expands from the root through discovered supported neighbours; there is no topology radius limit |
+| `--max-concurrent N` | Parallel collector clamps concurrency to 1–10; default 5. This limits simultaneous work, not total discovered devices |
+| `--checkpoint-file PATH` | Saves and restores traversal state; use the same inventory, output and scope to resume |
+| `--dry-run` with the default recursive path | Simulates seed commands and packaging; does not establish live discovery or collection success |
 
-You can force a profile explicitly with `-ParamikoProfile modern` or `-ParamikoProfile legacy`; the default `auto` probes the device to decide.
+Without `--target-device`, recursive collection uses the sequential orchestrator. A supplied topology file is not required for initial discovery. `--scope-depth` does not impose a depth bound on an unscoped run.
 
-You can also skip the dependency reinstall step on repeat runs:
+Command-profile coverage differs from automatic neighbour classification. The classifier recognises Cisco, Aruba, FortiGate/Fortinet and Juniper markers; profile presence alone does not prove automatic traversal or live support.
 
-```powershell
-.\interactive_bootstrap.ps1 -SkipInstall
-```
+## Outputs and boundaries
 
-### Option 3: direct CLI run with an inventory file
+A live device directory contains raw command text, `summary.json`, `ai_prompt.txt`, `troubleshooting_bundle.json` and normally `build_provenance.json`. Its ZIP sits **beside** the device directory. Root `bundle_manifest.json`, `topology.json` and recursive `console.log` provide the run view. Dry runs omit health/troubleshooting analysis.
 
-Copy `config/devices.yml.example` to `config/devices.yml` and edit it with your device details:
+The collector filters diagnostic commands and does not intentionally change device configuration. SSH sessions still use credentials and device resources. Default host-key policy, legacy compatibility, credential storage and estate-wide operating limits need deployment-specific assessment.
 
-```powershell
-Copy-Item config\devices.yml.example config\devices.yml
-```
+Topology records observed LLDP/CDP relationships, not a complete physical inventory. Unknown or uncollected neighbours can remain edge targets without collected nodes. Alias resolution applies to the matching identities covered by PHASE-087/087A; differing management addresses can evade it.
 
-```yaml
-devices:
-  - name: access-switch-01
-    hostname: 10.0.0.10
-    vendor: aruba
-    port: 22
-    username: admin
-    password: "<PASSWORD>"
-```
+Provenance helps attribute evidence to source. A dirty tracked diff can include sensitive text; untracked source files are not reconstructable from that diff alone. Inspect bundles before sharing.
 
-`config/*.yml` files are gitignored to prevent accidental commits of credentials; only `*.example` templates are tracked.
+Historical documents, tests, Git history and local archives contain sensitive-data exposure candidates. This repository is **not cleared for public publication**. The closure report records the review without reproducing identifiers. Do not distribute an existing ZIP as the closure release.
 
-You can also reference environment variables for any credential field using the exact form `${ENV_VAR_NAME}`:
+## Repository and continuation
 
-```yaml
-default:
-  username: admin
-  password: "<PASSWORD>"
+`app/` contains the collector; `tests/` contains regressions; `config/*.example` contains inventory templates. The journal and decision register in `docs/` preserve governance history. Raw field evidence and generated outputs remain local.
 
-devices:
-  - name: access-switch-01
-    hostname: 10.0.0.10
-    vendor: aruba
-    port: 22
-    username: ${NRE_SWITCH_USERNAME}
-    password: "<PASSWORD>"
-```
-
-If a referenced environment variable is missing, the tool will report a clear error before attempting any connection.
-
-Then run a dry validation:
-
-```powershell
-.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir demo_output --dry-run
-```
-
-Run a live collection:
-
-```powershell
-.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output
-```
-
-Run with detailed SSH diagnostics:
-
-```powershell
-.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --verbose
-```
-
-## Recursive collection
-
-Collect from a seed device and discover neighbouring infrastructure devices automatically:
-
-```powershell
-.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --recursive
-```
-
-The first device in the inventory becomes the seed. Supported neighbours (Cisco, Aruba, FortiGate, Juniper) are queued and collected automatically; unsupported devices are recorded but skipped. Omitting `--recursive` performs a flat, non-recursive collection of the configured devices only.
-
-### Scope collection to a target device and its neighbours
-
-Use `--target-device` to limit recursion to a single device and its direct topology neighbours:
-
-```powershell
-.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --recursive --target-device core-switch-01
-```
-
-This requires a `topology.json` file in the output directory. If no topology file exists, collection is limited to the named device only. Omitting `--target-device` runs recursive collection unscoped using the sequential orchestrator without topology-based limiting. `--target-device` is the only path that enables parallel SSH sessions.
-
-### Bounded parallel collection
-
-When `--target-device` is used, multiple devices in scope are collected concurrently. The default concurrency is 5 and the maximum allowed is 10:
-
-```powershell
-.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --recursive --target-device core-switch-01 --max-concurrent 8
-```
-
-Parallel collection is gated by scoping to prevent estate-wide AAA or device overload.
-
-## Checkpoint and resume
-
-Long-running recursive collections can be resumed. Pass `--checkpoint-file` to persist state after each device is processed:
-
-```powershell
-.\.venv\Scripts\python.exe -m app.cli --config config\devices.yml --output-dir output --recursive --checkpoint-file output\checkpoint.json
-```
-
-Omitting `--checkpoint-file` runs collection without loading or saving checkpoint state. If the run is interrupted, rerun the same command. Visited, pending, successful, failed, and unsupported device lists are restored and the queue continues from the last saved state.
-
-When `--target-device` is used, checkpoint state is filtered to the same scope, so out-of-scope pending entries cannot re-enter the collection.
-
-## Live run behavior
-
-The tool will:
-
-- test SSH reachability
-- detect vendor automatically when configured as `vendor: auto`
-- run the allowed read-only commands for that device family
-- capture raw output for each command
-- write a device bundle and summary JSON
-- create an AI prompt file suitable for troubleshooting analysis
-- export the final bundle as a ZIP archive
-
-## Output format
-
-Each device produces a directory under the output folder, for example:
-
-- `output/access-switch-01/`
-  - `summary.json` - structured device state, health score, discovered neighbours
-  - `show_version.txt`, `show_interfaces_brief.txt`, ... - raw command output
-  - `ai_prompt.txt` - AI-ready diagnostic briefing
-  - `troubleshooting_bundle.json` - normalised summary + health assessment
-  - `access-switch-01.zip` - packaged device bundle
-
-The following artefacts are also written to the output root:
-
-- `output/bundle_manifest.json` - list of all collected devices, sorted by device name
-- `output/topology.json` - discovered device graph; used by `--target-device` scoping
-
-### summary.json fields
-
-Key fields include:
-
-- `device` - inventory name
-- `hostname` - management address
-- `vendor` - detected or configured vendor
-- `platform` / `model` - platform identification when available
-- `role` - inferred device role when available
-- `commands_run` - number of diagnostic commands executed
-- `failed_commands` - list of commands that returned errors
-- `discovered_neighbors` - neighbour records from CDP/LLDP
-- `status` - one of `collected`, `partial`, `unreachable`, `dry-run-success`
-- `health_score` - numeric score added when collection completes successfully
-- `warnings` / `critical` - deterministic health observations
-
-### troubleshooting_bundle.json
-
-A condensed diagnostic bundle combining the normalised summary, health score, warnings, critical items, and selected raw outputs. It is intended for direct review or LLM-assisted troubleshooting without exposing every raw file.
-
-### topology.json
-
-A graph of discovered devices and their adjacencies. It is produced at the end of every run and is required by `--target-device` scoping for subsequent targeted collections.
-
-## SSH compatibility notes
-
-Older network appliances sometimes reject modern Paramiko defaults during key exchange negotiation. The tool includes compatibility fallbacks for legacy algorithms and surfaces a clearer diagnostic message when the SSH peer is older or incompatible.
-
-If a device fails with an SSH handshake error, the connection logic will retry with legacy KEX fallbacks and print a more actionable explanation in verbose mode.
-
-Per-device host-key options are also supported in the inventory (`host_key_policy`, optional `known_hosts`), so strict verification can be enabled in production; see `config/devices.yml` and `interactive_bootstrap.ps1` for examples.
-
-## Project structure
-
-- `app/` - CLI, collector, SSH client, vendor profiles, and detection logic
-- `config/` - sample device inventory and generated runtime config
-- `tests/` - regression coverage for dry-run behavior, vendor detection, and SSH compatibility
-- `interactive_bootstrap.ps1` - single-command entry point for local setup and collection
-
-## Portable distribution
-
-The recommended distribution for managed enterprise endpoints is an embedded Python runtime bundle. This avoids low-prevalence PyInstaller executables that are blocked by Microsoft Defender ASR Rule `01443614-CD74-433A-B99E-2ECDC07BFC25` ("Block executable files from running unless they meet a prevalence, age, or trusted list criterion") before the application can start, as observed during field testing on a <CUSTOMER> production server.
-
-Build the default embedded-runtime bundle from the project root:
-
-```powershell
-.\.venv\Scripts\python.exe -m build_portable
-```
-
-The build produces `dist\NetworkReconEngine.zip`. Extract the archive on the target workstation and run the launcher script:
-
-```powershell
-.\Start_NetworkRecon.cmd --output-dir output --verbose
-```
-
-or, if PowerShell script execution is permitted:
-
-```powershell
-.\Start_NetworkRecon.ps1 --output-dir output --verbose
-```
-
-The bundle contains the official, unmodified CPython embeddable interpreter from python.org, the application source (`app/`), runtime dependencies, a `config/` directory, and the launcher scripts. No system Python installation, virtual environment, or administrative rights are required.
-
-### Interactive packaged launch
-
-If you do not have a prepared inventory, launch without `--config` and enter the device details at the prompts:
-
-```powershell
-.\Start_NetworkRecon.cmd --output-dir output --verbose
-```
-
-The launcher will prompt for hostname/IP, username, hidden password, SSH port (default `22`), and vendor (default `auto`), then write a temporary runtime YAML and continue with collection.
-
-### Packaged launch with an existing inventory
-
-If you already have an inventory file, use the same `--config` path as the source CLI:
-
-```powershell
-.\Start_NetworkRecon.cmd --config config\devices.yml --output-dir output
-```
-
-### Legacy PyInstaller executable
-
-The previous PyInstaller-based executable build is retained as a secondary option for environments where it is permitted:
-
-```powershell
-.\.venv\Scripts\python.exe -m build_portable --pyinstaller
-```
-
-This produces `dist\NetworkDeviceDiagnostics.zip` containing `NetworkDeviceDiagnostics.exe`. On managed endpoints with strict ASR policies this executable may be blocked before startup.
-
-The source-based workflow remains available and unchanged for development or custom environments.
-
-## Typical workflow
-
-1. Start the project with `interactive_bootstrap.ps1` or the packaged `NetworkDeviceDiagnostics.exe`
-2. Enter the device host, username, port, and password
-3. Review the generated bundle under the output directory
-4. Use the summary, troubleshooting bundle, and AI prompt files to investigate the device state
-5. For larger environments, use `--recursive` with `--checkpoint-file` to discover neighbours and resume after an interruption
-
-## Requirements
-
-- Python 3.10+
-- Paramiko
-- PyYAML
-- Windows PowerShell is used for the interactive bootstrap script, but the Python CLI itself can be run in a standard Python env
+[CONTINUATION-HANDOVER.md](CONTINUATION-HANDOVER.md) is the backlog entry point. PHASE-089 and PHASE-088 are deferred to a separate continuation repository; neither is active work here. Preserve this experiment as a restricted historical record, then archive it after its exact baseline has been recorded.

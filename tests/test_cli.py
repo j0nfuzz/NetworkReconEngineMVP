@@ -660,6 +660,130 @@ def test_build_topology_graph_neighbor_without_ip_remains_compatible():
     assert graph["edges"] == [{"source": "SW01", "target": "SW02"}]
 
 
+def test_build_topology_graph_resolves_alias_to_canonical_node_by_ip():
+    """PHASE-087A: an LLDP-reported alias whose IP matches a collected device's hostname
+    must resolve to the canonical node, preserving the alias on the edge."""
+    summaries = [
+        {
+            "device": "192.168.2.241",
+            "hostname": "192.168.2.241",
+            "vendor": "aruba",
+            "role": "switch",
+            "discovered_neighbors": [],
+        },
+        {
+            "device": "HOSTNAME-06",
+            "hostname": "192.168.2.242",
+            "vendor": "aruba",
+            "role": "switch",
+            "discovered_neighbors": [
+                {
+                    "neighbor": "HOSTNAME-05",
+                    "ip": "192.168.2.241",
+                    "source": "show lldp neighbor-info detail",
+                },
+            ],
+        },
+    ]
+    graph = build_topology_graph(summaries)
+    assert set(graph["nodes"].keys()) == {"192.168.2.241", "HOSTNAME-06"}
+    assert graph["nodes"]["HOSTNAME-06"]["neighbors"] == ["192.168.2.241"]
+    assert graph["nodes"]["HOSTNAME-06"]["neighbor_addresses"] == {
+        "192.168.2.241": "192.168.2.241"
+    }
+    assert graph["edges"] == [
+        {
+            "source": "HOSTNAME-06",
+            "target": "192.168.2.241",
+            "ip": "192.168.2.241",
+            "alias": "HOSTNAME-05",
+        }
+    ]
+
+
+def test_build_topology_graph_resolves_alias_to_canonical_node_by_hostname():
+    """PHASE-087A: an LLDP-reported alias whose name matches a collected device's hostname
+    must resolve to the canonical node, preserving the alias on the edge."""
+    summaries = [
+        {
+            "device": "192.168.2.241",
+            "hostname": "HOSTNAME-05",
+            "vendor": "aruba",
+            "role": "switch",
+            "discovered_neighbors": [],
+        },
+        {
+            "device": "HOSTNAME-06",
+            "hostname": "192.168.2.242",
+            "vendor": "aruba",
+            "role": "switch",
+            "discovered_neighbors": [
+                {
+                    "neighbor": "HOSTNAME-05",
+                    "source": "show lldp neighbor-info detail",
+                },
+            ],
+        },
+    ]
+    graph = build_topology_graph(summaries)
+    assert set(graph["nodes"].keys()) == {"192.168.2.241", "HOSTNAME-06"}
+    assert graph["nodes"]["HOSTNAME-06"]["neighbors"] == ["192.168.2.241"]
+    assert graph["edges"] == [
+        {
+            "source": "HOSTNAME-06",
+            "target": "192.168.2.241",
+            "alias": "HOSTNAME-05",
+        }
+    ]
+
+
+def test_build_topology_graph_distinct_neighbor_unchanged():
+    """PHASE-087A: a neighbor with no identity overlap must be emitted unchanged."""
+    summaries = [
+        {
+            "device": "SW01",
+            "vendor": "aruba",
+            "role": "switch",
+            "discovered_neighbors": [
+                {
+                    "neighbor": "SW02",
+                    "ip": "192.168.2.10",
+                    "source": "show lldp neighbor-info detail",
+                },
+            ],
+        }
+    ]
+    graph = build_topology_graph(summaries)
+    assert graph["nodes"]["SW01"]["neighbors"] == ["SW02"]
+    assert graph["edges"] == [{"source": "SW01", "target": "SW02", "ip": "192.168.2.10"}]
+
+
+def test_build_topology_graph_no_duplicate_node_from_alias():
+    """PHASE-087A: resolving an alias must not create a duplicate logical node."""
+    summaries = [
+        {
+            "device": "192.168.2.241",
+            "hostname": "192.168.2.241",
+            "vendor": "aruba",
+            "role": "switch",
+            "discovered_neighbors": [],
+        },
+        {
+            "device": "HOSTNAME-06",
+            "hostname": "192.168.2.242",
+            "vendor": "aruba",
+            "role": "switch",
+            "discovered_neighbors": [
+                {"neighbor": "HOSTNAME-05", "ip": "192.168.2.241"},
+            ],
+        },
+    ]
+    graph = build_topology_graph(summaries)
+    assert "HOSTNAME-05" not in graph["nodes"]
+    for edge in graph["edges"]:
+        assert edge["target"] in graph["nodes"]
+
+
 def test_ssh_client_retries_on_legacy_kex_failure(monkeypatch):
     calls = {"count": 0}
 

@@ -69,6 +69,19 @@ def _probe_identity(device: Device) -> Optional[str]:
     return None
 
 
+def _device_identity_set(device: Device) -> set[str]:
+    """Return the identity-equivalence set for a device (name + hostname).
+
+    Hostnames and names are normalised to lower-case because network identities
+    are case-insensitive; this lets the same physical box be recognised whether
+    it is reached by LLDP-reported system-name or management-address.
+    """
+    identities: set[str] = {device.name.lower()}
+    if device.hostname:
+        identities.add(device.hostname.lower())
+    return identities
+
+
 def _reconstruct_pending_devices(
     pending_names: List[str],
     discovered: List[Dict[str, str]],
@@ -130,8 +143,12 @@ def run_recursive_collection(
     queue: deque[Device] = deque(pending_devices)
     if seed_device.name not in visited:
         queue.append(seed_device)
+
+    known_identities: set[str] = set()
+    known_identities.update({name.lower() for name in visited})
     for device in queue:
         queued.add(device.name)
+        known_identities.update(_device_identity_set(device))
 
     probe_errors: Dict[str, str] = {}
 
@@ -208,18 +225,21 @@ def run_recursive_collection(
                     failed.append(neighbor_name)
                 continue
 
-            queued.add(neighbor_name)
-            queue.append(
-                Device(
-                    name=neighbor_name,
-                    hostname=ip,
-                    vendor=classification,
-                    username=defaults.get("username", ""),
-                    password=defaults.get("password", ""),
-                    enable_password=defaults.get("enable_password"),
-                    metadata={"discovered_neighbor": True},
-                )
+            neighbor_device = Device(
+                name=neighbor_name,
+                hostname=ip,
+                vendor=classification,
+                username=defaults.get("username", ""),
+                password=defaults.get("password", ""),
+                enable_password=defaults.get("enable_password"),
+                metadata={"discovered_neighbor": True},
             )
+            if _device_identity_set(neighbor_device) & known_identities:
+                continue
+
+            queued.add(neighbor_name)
+            known_identities.update(_device_identity_set(neighbor_device))
+            queue.append(neighbor_device)
 
         _emit_checkpoint()
 
