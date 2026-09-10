@@ -5084,3 +5084,33 @@ Risks Resolved:
 
 Next Recommended Action:
 - Verify the closure commit matches origin/master after push. Annotated tagging, controlled archival and any continuation remain separate actions.
+
+---
+
+Date: 2026-09-10
+Agent: Astra (executed by Codex)
+Phase: PHASE-091-ExperimentClosureBuildAndBaselineCapture
+
+Changes:
+- Verified clean baseline 68b4dad94ac91cbcce7a5233b5c5b7244794f64b, including the already committed reviewed PHASE-087/087A implementation; origin/master matched before this documentation update.
+- Built with the unchanged default embedded-runtime builder in a clean isolated checkout. Created dist/NetworkReconEngine-PHASE-091.zip: 21,179,113 bytes; SHA-256 26fb460aa6264b18231b5dc896426ec998de61489d9729c2ef9b4a4a324d366e; build timestamp 2026-09-10T13:48:09.491970+00:00.
+- Created docs/Phases/IMPLEMENTED-PHASE-091-ExperimentClosureBuildAndBaselineCapture.md with baseline reconciliation, dependency versions, verification and environment qualifications. Preserved historical PHASE-085 archive and PHASE-090 execution records.
+- Prepared only the implementation record and this append for the explicitly authorised commit/push message "Final Experiment Release". The documentation commit follows the immutable build source; ZIP remains ignored and locally delivered under existing policy. No hosted release or tag is included.
+
+Reason:
+- Supply the final attributable experiment package after approved identity and topology fixes, without reopening development.
+
+Validation:
+- py_compile: 40 files passed. Full pytest: 354 passed, one established fallback warning, with both the established environment and the fresh package runtime/dependencies.
+- Final manifest/runtime provenance present and matching source SHA; dirty=false; patch/checksum empty; exact config exclusions. Complete archive CRC/extraction and staged-source comparison passed.
+- CMD and PowerShell launchers passed help and external-directory synthetic dry runs with Git unavailable; both emitted correct runtime provenance and expected artefacts. Config contains only the two tracked .example templates; no live/test YAML or raw evidence.
+- Initial environment issues (ignored test inventory absent; metadata-sensitive provenance tests; Git line-ending fingerprints) were isolated and recorded. No production/test code changed; only the final clean build is delivered.
+
+Risks Introduced:
+- None in application behaviour. Fresh dependencies satisfy existing minimum-version requirements and are recorded; no new live compatibility or bit-for-bit rebuild claim.
+
+Risks Resolved:
+- Final portable package now contains PHASE-087/087A and has verified clean baseline attribution; the previous source/package gap is closed.
+
+Next Recommended Action:
+- Verify the authorised documentation commit matches origin/master after push, then stop PHASE-091. Experiment complete; scoped MVP achieved; production readiness unclaimed. No remediation, backlog or continuation work is activated. DDR unchanged (last decision date 2026-09-08).
