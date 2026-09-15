@@ -37,9 +37,7 @@ field_output_040/
 config/*.yml
 !config/*.yml.example
 
-# Packaged distribution artefacts
-dist/
-*.zip
+# Packaged distribution artefacts (sanitised build intentionally tracked; see SANITISATION-REPORT.md)
 
 # Local pytest basetemp (see pytest.ini addopts)
 .pytest_tmp/
