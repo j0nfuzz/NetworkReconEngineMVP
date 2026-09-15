@@ -55,6 +55,71 @@ The Python CLI's interactive inventory is temporary and supplies default credent
 
 The separate PowerShell bootstrap supports environment recovery and SSH-profile selection, but its current generated inventory has no default credentials block. Use the direct Python CLI or an explicit inventory for the demonstrated recursive workflow.
 
+## Run the portable build (.zip)
+
+A pre-built Windows bundle is included at `dist\NetworkReconEngine.zip`. It embeds CPython 3.12 plus all application dependencies, so a target workstation needs **no system Python, Git, or virtual environment**.
+
+1. Copy `dist\NetworkReconEngine.zip` to the workstation and extract it.
+2. Open PowerShell inside the extracted folder and run:
+
+   ```powershell
+   .\Start_NetworkRecon.cmd --output-dir output --verbose
+   ```
+
+   If PowerShell script execution is permitted, `.\Start_NetworkRecon.ps1` accepts the same arguments. Both launchers simply run the bundled interpreter on `run_portable.py` with the arguments passed through.
+
+Without `--config`, the tool prompts interactively for hostname or IP, username, password (hidden), SSH port (Enter accepts `22`), and vendor (Enter accepts `auto`). It writes the answers to a temporary inventory in the system temp directory, runs the collection, and deletes it.
+
+### Recommended: always pass `--verbose`
+
+Pass `--verbose` on every run. It prints detailed SSH and collection diagnostics to the console — per-device `Starting device:` / `Finished collection:` messages, probe errors, and the reason a collection stopped — so you can see which device is being collected, where a run is stuck, and what actually failed without opening the output folder. The same messages are always written to the run's `console.log` even without the flag, so enabling `--verbose` costs nothing and simply mirrors the log to the screen.
+
+```powershell
+.\Start_NetworkRecon.cmd --output-dir output --verbose
+```
+
+### Switches
+
+| Switch | Effect |
+|---|---|
+| `--config PATH` | Use an existing YAML inventory. Omit for interactive prompts |
+| `--output-dir DIR` | Output directory (default `output`) |
+| `--verbose` | Print detailed SSH and collection diagnostics (recommended; see above) |
+| `--dry-run` | Validate configuration and simulate collection without connecting |
+| `--probe` | Check reachability and legacy/modern classification, then exit |
+| `--recursive` | Backward-compatible alias — recursive discovery is already the default |
+| `--no-recurse` | Flat collection of the configured devices only |
+| `--target-device NAME` | Use a configured device as the traversal root; restricts scope to its topology |
+| `--scope-depth N` | Topology radius for `--target-device` (default 1; no effect otherwise) |
+| `--max-concurrent N` | Maximum simultaneous SSH sessions, 1–10 (default 5) |
+| `--checkpoint-file PATH` | Save and resume traversal state; reuse the same inventory, output and scope |
+
+### Inventory and examples
+
+To use an existing inventory, create `config\devices.yml` from `config\devices.yml.example` using `<USERNAME>` / `<PASSWORD>` placeholders or `${ENV_VAR}` references (for example `${NRE_SAMPLE_CISCO_PASSWORD}`) so secrets stay out of the file, then pass it explicitly:
+
+```powershell
+.\Start_NetworkRecon.cmd --config config\devices.yml --output-dir output --verbose
+```
+
+A typical recursive run with checkpoints:
+
+```powershell
+.\Start_NetworkRecon.cmd --config config\devices.yml --output-dir output --recursive --checkpoint-file output\checkpoint.json --verbose
+```
+
+Validate without connecting:
+
+```powershell
+.\Start_NetworkRecon.cmd --output-dir demo_output --dry-run
+```
+
+Recursive discovery is the default; `--no-recurse` selects flat collection. Only use reachable devices within an authorised lab. Treat runtime inventory YAML and generated output as sensitive.
+
+Full operations guidance — including profile selection, moved-workstation recovery and deployment troubleshooting — is in [HOWTO-PORTABLE.md](docs/HOWTO-PORTABLE.md).
+
+The checked-in zip is the rebuilt, verified-sanitised artefact (hash and evidence in [PUBLICATION-REMEDIATION-REPORT.md](PUBLICATION-REMEDIATION-REPORT.md)). For an actual release, rebuild it from a clean committed checkout as described in [Publication builds](#publication-builds).
+
 ## Current CLI behaviour
 
 | Invocation | Behaviour |
