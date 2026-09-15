@@ -5,7 +5,7 @@ FILES:
 .mailmap
 
 ACCEPTANCE CRITERIA:
-- All 34 commits show author and committer as a neutral identity (`<USERNAME>` <person@example.com>); zero commits reference jon@<USERNAME>.me or "legacy-user" afterward.
+- All 34 commits show author and committer as a neutral identity (`<USERNAME>` <person@example.com>); zero commits retain the original personal names or email addresses afterward.
 - Commit count remains 34; chronological order and all commit messages are unchanged (byte-for-byte, verified via `git log --format=%H %ad %s`).
 - Tree/diff content of every commit is identical before and after rewrite (verified via `git diff <old-tag> <new-ref>` on each commit producing no output).
 - Local backup/tag of the pre-rewrite history exists before the force-push, so the operation is reversible if the push is rejected or reverted upstream.

@@ -17,7 +17,7 @@ class DeviceSSHClient:
         "diffie-hellman-group14-sha256",
         "diffie-hellman-group16-sha512",
         "diffie-hellman-group-exchange-sha256",
-        "person@example.com",
+        "curve25519-sha256@libssh.org",
     )
 
     @staticmethod

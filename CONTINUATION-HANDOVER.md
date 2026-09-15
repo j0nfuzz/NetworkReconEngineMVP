@@ -1,5 +1,7 @@
 # Continuation handover
 
+**Publication follow-up:** a sanitised continuation repository remains recommended. Export the reviewed current source and documents without the existing Git history or local runtime/output folders; rebuild release packages. See [SANITISATION-REPORT.md](SANITISATION-REPORT.md).
+
 PHASE-090 closes development in the experiment repository. The experiment and scoped MVP are complete; continuation is optional future work in a **separate repository**. No new repository has been created and no destination URL has been invented.
 
 ## Complete

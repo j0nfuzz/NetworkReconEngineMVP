@@ -20,6 +20,8 @@ def _reset_sys_argv():
 
 
 def test_main_defaults_to_embedded_modern_profile(monkeypatch, tmp_path):
+    monkeypatch.setattr(build_portable.subprocess, "run", lambda *a, **kw:
+                        build_portable.subprocess.CompletedProcess(a, 0, stdout="", stderr=""))
     calls = []
 
     def fake_build_embedded(repo_root, dist_dir, *, legacy=False):
@@ -39,6 +41,8 @@ def test_main_defaults_to_embedded_modern_profile(monkeypatch, tmp_path):
 
 
 def test_main_legacy_flag_selects_legacy_requirements(monkeypatch, tmp_path):
+    monkeypatch.setattr(build_portable.subprocess, "run", lambda *a, **kw:
+                        build_portable.subprocess.CompletedProcess(a, 0, stdout="", stderr=""))
     calls = []
 
     def fake_build_embedded(repo_root, dist_dir, *, legacy=False):

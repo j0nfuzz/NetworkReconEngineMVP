@@ -8,7 +8,7 @@ interactive_bootstrap.ps1
 
 ACCEPTANCE CRITERIA:
 - HOWTO-PORTABLE.md documents a script-based launch path (bootstrap + source CLI) as the recommended method for ASR-restricted/managed endpoints.
-- README.md records the <CUSTOMER> field-test finding (Defender ASR Rule 01443614 blocks unsigned .exe) as a known deployment constraint.
+- README.md records the `<CUSTOMER>` field-test finding (Defender ASR Rule 01443614 blocks unsigned .exe) as a known deployment constraint.
 - No changes to app/cli.py, build_portable.py, or collection/packaging/checkpoint logic.
 - Existing 64 tests continue to pass.
 

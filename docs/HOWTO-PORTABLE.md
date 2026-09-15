@@ -157,7 +157,7 @@ Dry runs are different: they create simulated raw command output and a raw summa
 
 ## Packaged embedded-runtime bundle
 
-The recommended distribution for managed enterprise endpoints bundles the official CPython embeddable runtime with the application source and dependencies. This avoids low-prevalence executables produced by PyInstaller, which were blocked before startup during field testing on a <CUSTOMER> production server by Microsoft Defender ASR Rule `01443614-CD74-433A-B99E-2ECDC07BFC25` ("Block executable files from running unless they meet a prevalence, age, or trusted list criterion").
+The recommended distribution for managed enterprise endpoints bundles the official CPython embeddable runtime with the application source and dependencies. This avoids low-prevalence executables produced by PyInstaller, which were blocked before startup during field testing on a `<CUSTOMER>` production server by Microsoft Defender ASR Rule `01443614-CD74-433A-B99E-2ECDC07BFC25` ("Block executable files from running unless they meet a prevalence, age, or trusted list criterion").
 
 Build the bundle:
 
@@ -237,7 +237,7 @@ The previous PyInstaller-based executable build is retained as a secondary optio
 .\.venv\Scripts\python.exe -m build_portable --pyinstaller
 ```
 
-This produces `dist\NetworkDeviceDiagnostics.zip` containing `NetworkDeviceDiagnostics.exe`. On managed endpoints with strict ASR policies this executable may be blocked before startup, as observed during <CUSTOMER> field testing.
+This produces `dist\NetworkDeviceDiagnostics.zip` containing `NetworkDeviceDiagnostics.exe`. On managed endpoints with strict ASR policies this executable may be blocked before startup, as observed during `<CUSTOMER>` field testing.
 
 ## Direct CLI Recovery
 

@@ -1,5 +1,7 @@
 # Network Recon Engine
 
+**Publication preparation (14 September 2026):** identifying working-tree data has been replaced with placeholders. The existing Git history and local binaries are not cleared for public release. See [SANITISATION-REPORT.md](SANITISATION-REPORT.md) before publishing or copying this folder.
+
 **Completed AI-assisted engineering experiment; working prototype.**
 PHASE-090 closes the experiment on 8 September 2026. Routine production deployment readiness is not claimed. Development is frozen in this experiment workspace; the reviewed implementation is captured with the closure documentation in the commit titled `Experiment Complete 2026-09-08`. Release tagging and hosting-side archival remain separate preparation tasks.
 

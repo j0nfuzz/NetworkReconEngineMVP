@@ -1,5 +1,7 @@
 # IMPLEMENTED-PHASE-091-ExperimentClosureBuildAndBaselineCapture
 
+**Historical build record:** the local archive was subsequently sanitised on 14 September 2026. The SHA-256, size and byte-comparison claims below describe the original build, not the edited derivative. The current publication assessment is in [SANITISATION-REPORT.md](../../SANITISATION-REPORT.md).
+
 Date: 2026-09-10
 Agent: Astra (executed by Codex)
 Status: Implemented and validated; build/packaging only, no product changes.

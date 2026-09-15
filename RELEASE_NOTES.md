@@ -1,5 +1,7 @@
 # Release notes — experiment-complete-2026-09
 
+**Sanitisation follow-up, 14 September 2026:** existing local packages have been edited as sanitised derivatives and are not verified public release assets. Historical provenance describes their original content. Rebuild from the sanitised source before release; see [SANITISATION-REPORT.md](SANITISATION-REPORT.md).
+
 **Prepared release; tag not created.** Date: 8 September 2026.
 Release type: engineering experiment baseline / working prototype.
 Source baseline: the commit titled `Experiment Complete 2026-09-08`, containing the reviewed implementation, tests and closure documentation. Origin is the existing private repository.

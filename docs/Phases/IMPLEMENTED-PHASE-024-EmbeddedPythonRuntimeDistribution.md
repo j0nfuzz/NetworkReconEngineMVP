@@ -16,7 +16,7 @@ FILES MODIFIED:
   - Added bundle-root path insertion so the embedded interpreter can locate app/.
 - README.md
   - Documented embedded-runtime bundle as the recommended managed-endpoint distribution.
-  - Added <CUSTOMER> field-test evidence and ASR Rule 01443614 rationale.
+  - Added `<CUSTOMER>` field-test evidence and ASR Rule 01443614 rationale.
   - Moved PyInstaller executable guidance to a legacy section.
 - docs/HOWTO-PORTABLE.md
   - Documented the embedded-runtime bundle workflow and archive contents.
@@ -42,11 +42,11 @@ UNCHANGED DD:DD-005
 RISKS INTRODUCED:
 - ZIP size is materially larger than the PyInstaller package (embedded interpreter + dependencies).
 - Embeddable runtime must be kept in sync with the project's Python 3.12+ requirement.
-- Whether the embedded python.exe avoids ASR blocking on all managed estates requires further field validation; <CUSTOMER> proved scripts are allowed but the embedded runtime itself was not field-tested.
+- Whether the embedded python.exe avoids ASR blocking on all managed estates requires further field validation; `<CUSTOMER>` proved scripts are allowed but the embedded runtime itself was not field-tested.
 
 RISKS RESOLVED:
 - Distribution no longer depends on a system Python installation.
 - Default distribution avoids low-prevalence PyInstaller executables blocked by Defender ASR Rule 01443614.
 
 OPEN ISSUES:
-- Field-test the bundled python.exe on the <CUSTOMER> endpoint to confirm it is not also blocked by ASR or other trust controls.
+- Field-test the bundled python.exe on the `<CUSTOMER>` endpoint to confirm it is not also blocked by ASR or other trust controls.

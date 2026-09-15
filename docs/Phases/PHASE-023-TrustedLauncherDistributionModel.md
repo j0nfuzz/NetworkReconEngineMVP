@@ -9,7 +9,7 @@ README.md
 ACCEPTANCE CRITERIA:
 - ZIP distribution's primary entry point is a double-click .cmd/.ps1 launcher, not NetworkDeviceDiagnostics.exe.
 - Launcher invokes source app/cli.py via system/bootstrap-resolved Python; no compiled PE executable is required to start the tool.
-- README/HOWTO document that this model avoids Defender ASR Rule 01443614 (blocks low-prevalence PE executables), citing the <CUSTOMER> field test.
+- README/HOWTO document that this model avoids Defender ASR Rule 01443614 (blocks low-prevalence PE executables), citing the `<CUSTOMER>` field test.
 - Engineer workflow remains extract -> double-click launcher -> enter details -> collect, with no visible Python/repo knowledge required.
 - Existing 64 tests continue to pass; no changes to app/cli.py collection logic.
 

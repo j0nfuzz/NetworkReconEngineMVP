@@ -27,8 +27,8 @@ uptime is 2 years, 18 weeks, 4 days, 5 hours, 30 minutes
 I/O Pool Total: 20000  Used: 1000  Free: 19000""",
         "show ip route summary": "IP routing table contains 143 routes",
         "show arp": """Protocol  Address          Age (min)  Hardware Addr   Type   Interface
-Internet  10.0.0.1                -   abcd.1234.5678  ARPA   Vlan10
-Internet  10.0.0.2              123   abcd.1234.5679  ARPA   Vlan10
+Internet  10.0.0.1                -   0011.2233.44c1  ARPA   Vlan10
+Internet  10.0.0.2              123   0011.2233.44c2  ARPA   Vlan10
 """,
         "show interfaces": """GigabitEthernet1/0/24 is up
     12345 input errors, 678 CRC

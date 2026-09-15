@@ -163,7 +163,7 @@ def _build_embedded(repo_root: Path, dist_dir: Path, *, legacy: bool = False) ->
 
     print("Installing pip into embedded runtime ...")
     result = subprocess.run(
-        [str(py_exe), str(get_pip), "--no-warn-script-location"],
+        [str(py_exe), "-B", str(get_pip), "--no-warn-script-location", "--no-compile"],
         cwd=repo_root,
         check=False,
     )
@@ -173,7 +173,7 @@ def _build_embedded(repo_root: Path, dist_dir: Path, *, legacy: bool = False) ->
 
     print(f"Installing dependencies into embedded runtime from {requirements_file} ...")
     result = subprocess.run(
-        [str(py_exe), "-m", "pip", "install", "--no-warn-script-location", "-r", requirements_file],
+        [str(py_exe), "-B", "-m", "pip", "install", "--no-warn-script-location", "--no-compile", "-r", requirements_file],
         cwd=repo_root,
         check=False,
     )
@@ -182,7 +182,8 @@ def _build_embedded(repo_root: Path, dist_dir: Path, *, legacy: bool = False) ->
         return result.returncode
 
     # Stage application files.
-    shutil.copytree(repo_root / "app", bundle_dir / "app")
+    shutil.copytree(repo_root / "app", bundle_dir / "app",
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"))
     config_src = repo_root / "config"
     config_dst = bundle_dir / "config"
     config_dst.mkdir(parents=True)
@@ -190,7 +191,8 @@ def _build_embedded(repo_root: Path, dist_dir: Path, *, legacy: bool = False) ->
         if item.is_file() and item.suffix == ".example":
             shutil.copy2(item, config_dst / item.name)
         elif item.is_dir():
-            shutil.copytree(item, config_dst / item.name)
+                shutil.copytree(item, config_dst / item.name,
+                                ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"))
     shutil.copy2(repo_root / "run_portable.py", bundle_dir / "run_portable.py")
     shutil.copy2(repo_root / requirements_file, bundle_dir / requirements_file)
     if legacy:
@@ -242,6 +244,12 @@ def _build_embedded(repo_root: Path, dist_dir: Path, *, legacy: bool = False) ->
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for item in bundle_dir.rglob("*"):
             arcname = item.relative_to(bundle_dir)
+            # Installer launchers embed the build interpreter's absolute path;
+            # caches embed source paths. Neither is needed by the runtime.
+            if "__pycache__" in arcname.parts or item.suffix in {".pyc", ".pyo"}:
+                continue
+            if arcname.parts[:2] == ("python", "Scripts"):
+                continue
             zf.write(item, arcname=str(arcname))
 
     print(f"Embedded runtime bundle: {zip_path}")
@@ -267,6 +275,16 @@ def main() -> int:
 
     repo_root = Path(__file__).resolve().parent
     dist_dir = repo_root / "dist"
+
+    # A diff can contain removed credentials and identities. Publication builds
+    # must start from a committed source tree so none enter embedded provenance.
+    source_state = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=normal"],
+        cwd=repo_root, capture_output=True, text=True, check=False,
+    )
+    if source_state.returncode != 0 or source_state.stdout.strip():
+        print("Release build requires a clean Git checkout with committed source files.")
+        return 1
 
     if args.pyinstaller:
         return _build_pyinstaller(repo_root, dist_dir)

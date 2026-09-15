@@ -707,7 +707,7 @@ def test_build_topology_graph_resolves_alias_to_canonical_node_by_hostname():
     summaries = [
         {
             "device": "192.168.2.241",
-            "hostname": "HOSTNAME-05",
+            "hostname": "hostname-05",
             "vendor": "aruba",
             "role": "switch",
             "discovered_neighbors": [],
@@ -871,13 +871,13 @@ def test_ssh_client_explain_error_without_peer_kex_is_actionable():
 
 
 def test_ssh_client_extract_peer_kex_from_kexinit_packet():
-    # SSH_MSG_KEXINIT (20), 16-byte cookie, then name-list length + "person@example.com,diffie-hellman-group14-sha256"
+    # SSH_MSG_KEXINIT (20), 16-byte cookie, then name-list length + "curve25519-sha256@libssh.org,diffie-hellman-group14-sha256"
     cookie = b"\x00" * 16
-    kex_names = "person@example.com,diffie-hellman-group14-sha256"
+    kex_names = "curve25519-sha256@libssh.org,diffie-hellman-group14-sha256"
     name_list = struct.pack(">I", len(kex_names)) + kex_names.encode("utf-8")
     packet = bytes([20]) + cookie + name_list
     peer_kex = DeviceSSHClient._extract_peer_kex_from_init(packet)
-    assert peer_kex == ["person@example.com", "diffie-hellman-group14-sha256"]
+    assert peer_kex == ["curve25519-sha256@libssh.org", "diffie-hellman-group14-sha256"]
 
 
 def test_ssh_client_probe_reports_kex_diagnostics(monkeypatch):

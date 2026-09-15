@@ -1,5 +1,7 @@
 # Experiment closure — PHASE-090
 
+**Sanitisation follow-up, 14 September 2026:** the assessment below is historical. Working-tree identifiers and local archive contents have since been sanitised. Original source/test fingerprints, archive sizes and checksums below do not verify these edited bytes. See [SANITISATION-REPORT.md](SANITISATION-REPORT.md) for replacement counts, current validation and outstanding history exposure.
+
 Assessment date: 8 September 2026.
 
 **Closure decision: the engineering experiment is complete and the scoped MVP is achieved.** The result is a working prototype. Routine production deployment readiness and a publishable release are not established. PHASE-087/087A stay closed; DD-016 stays Approved. PHASE-090 adds documentation and release preparation only.

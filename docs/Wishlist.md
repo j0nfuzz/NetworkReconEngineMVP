@@ -328,13 +328,13 @@ default:
   username:
   password:
 
-"<PASSWORD>"
+Optional overrides:
 
 FW01:
   username:
   password:
 
-"<PASSWORD>"
+Objectives:
 
 - Minimal prompting
 - Reusable sessions
@@ -634,7 +634,7 @@ Bad:
 
 No Python at:
 
-C:\Users\<USERNAME>\AppData\Local\Programs\Python\Python312\python.exe
+C:\Users\`<USERNAME>`\AppData\Local\Programs\Python\Python312\python.exe
 
 Good:
 

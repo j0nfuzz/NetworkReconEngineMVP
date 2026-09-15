@@ -1,3 +1,3 @@
-# Author identity mapping for history sanitisation (PHASE-026).
-# Format: Proper Name <proper@email> <old@email>
-<USERNAME> <person@example.com> <person@example.com>
+# Publication-safe identity example. Historical source values are deliberately absent.
+# This file does not rewrite or anonymise existing commit objects.
+PERSON <person@example.com> <person@example.com>

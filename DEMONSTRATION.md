@@ -1,5 +1,7 @@
 # Reproducible demonstration
 
+**Sanitised examples:** use the current sanitised working tree or a reviewed export for these examples. Historical commits contain the original identifiers. Old source/test fingerprints and archive hashes identify pre-sanitisation bytes; see [SANITISATION-REPORT.md](SANITISATION-REPORT.md) for the current validation and export boundary.
+
 This guide is self-contained for a technically competent reader. It separates an offline reproduction from a live lab collection. All example names and addresses below are synthetic; `192.0.2.0/24` is a documentation range and must be replaced for live use.
 
 ## 1. Obtain the correct source and prepare Python
@@ -36,7 +38,7 @@ devices:
     hostname: 192.0.2.10
     vendor: aruba
     username: DEMO-USER
-    password: "<PASSWORD>"
+    password: <PASSWORD-EXAMPLE>
 '@ | Set-Content -Encoding UTF8 config\closure-demo.yml
 
 $demoOutput = Join-Path 'demo_output' ('closure-' + [guid]::NewGuid().ToString('N'))
@@ -117,7 +119,7 @@ $env:NRE_DEMO_PASSWORD = $demoCredential.GetNetworkCredential().Password
 @'
 default:
   username: ${NRE_DEMO_USER}
-  password: "<PASSWORD>"
+  password: ${NRE_DEMO_PASSWORD}
 devices:
   - name: 192.0.2.10
     hostname: 192.0.2.10

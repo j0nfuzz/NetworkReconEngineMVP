@@ -3,7 +3,7 @@ devices:
     hostname: '0.0.0.0'
     vendor: auto
     port: 22
-    username: 'USERNAME'
-    password: "<PASSWORD>"
+    username: '<USERNAME>'
+    password: '<PASSWORD>'
     timeout: 15
     host_key_policy: auto

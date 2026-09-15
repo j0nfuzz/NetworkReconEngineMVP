@@ -2378,11 +2378,11 @@ Changes:
 - Updated build_portable.py to default to an embedded-runtime bundle.
 - Bundled the official CPython 3.12.10 embeddable interpreter, app/, config/, dependencies, and Start_NetworkRecon.cmd/.ps1 launchers into dist\NetworkReconEngine.zip.
 - Updated run_portable.py to insert the bundle root into sys.path for the embedded interpreter.
-- Updated README.md and docs/HOWTO-PORTABLE.md to document the embedded-runtime workflow and the <CUSTOMER> ASR Rule 01443614 field-test evidence.
+- Updated README.md and docs/HOWTO-PORTABLE.md to document the embedded-runtime workflow and the `<CUSTOMER>` ASR Rule 01443614 field-test evidence.
 - Retained --pyinstaller flag for the legacy executable build.
 
 Reason:
-- <CUSTOMER> field testing proved the PyInstaller .exe is blocked by Defender ASR Rule 01443614 before startup, while scripts are allowed; the remaining blocker was Python availability. Bundling the official embeddable runtime removes the install dependency without code-signing or MSIX.
+- `<CUSTOMER>` field testing proved the PyInstaller .exe is blocked by Defender ASR Rule 01443614 before startup, while scripts are allowed; the remaining blocker was Python availability. Bundling the official embeddable runtime removes the install dependency without code-signing or MSIX.
 
 Risks Introduced:
 - ZIP size is materially larger (embedded interpreter + dependencies).
@@ -2393,7 +2393,7 @@ Risks Resolved:
 - Default distribution avoids low-prevalence PyInstaller executables.
 
 Next Recommended Action:
-- Field-validate the embedded runtime bundle on the <CUSTOMER> managed endpoint.
+- Field-validate the embedded runtime bundle on the `<CUSTOMER>` managed endpoint.
 
 ---
 
@@ -2429,7 +2429,7 @@ Agent: Kimi
 Phase: PHASE-026-GitHistoryAuthorSanitisation
 
 Changes:
-- Added .mailmap mapping the real employer-identifiable author identity to the neutral <USERNAME> identity across all 34 commits.
+- Added .mailmap mapping the real employer-identifiable author identity to the neutral `<USERNAME>` identity across all 34 commits.
 - Documented the exact git filter-repo, validation, rollback, and force-push commands in IMPLEMENTED-PHASE-026-GitHistoryAuthorSanitisation.md; the rewrite itself was not executed.
 
 Reason:
@@ -3864,7 +3864,7 @@ Agent: Kimi
 Phase: PHASE-066-DeviceZipFilenameTruncationRemediation
 
 Changes:
-- Updated app/collector.py::zip_bundle() to use the full directory name as the archive stem instead of Path.with_suffix(".zip"), preventing truncation of IP-address-named device directories (e.g. "192.168.2.241" becoming "192.168.1").
+- Updated app/collector.py::zip_bundle() to use the full directory name as the archive stem instead of Path.with_suffix(".zip"), preventing truncation of IP-address-named device directories (e.g. "192.168.2.241" becoming "192.168.2").
 - Added regression tests in tests/test_cli.py covering IP-named directory preservation, distinct prefix collision avoidance, and unchanged non-IP device naming.
 - Created docs/Phases/IMPLEMENTED-PHASE-066-DeviceZipFilenameTruncationRemediation.md.
 
@@ -5114,3 +5114,32 @@ Risks Resolved:
 
 Next Recommended Action:
 - Verify the authorised documentation commit matches origin/master after push, then stop PHASE-091. Experiment complete; scoped MVP achieved; production readiness unclaimed. No remediation, backlog or continuation work is activated. DDR unchanged (last decision date 2026-09-08).
+
+---
+
+Date: 2026-09-14
+Agent: Astra (executed by Codex)
+Phase: Publication sanitisation — user-authorised working-tree pass
+
+Changes:
+- Replaced identifying values across tracked documents, phase/review records, journal entries, test fixtures, example inventories and readable local outputs/configuration/archive members. The explicit repository-wide request authorises replacement within historical journal text; chronology, decisions and defect narratives are retained.
+- Used consistent synthetic device, IP and MAC identities where distinct values are required to preserve topology and test meaning. Kept vendor/platform names, protocol identifiers, versions and technical role assignments.
+- Replaced identity-bearing mailmap content with a neutral valid example. This does not anonymise existing commit objects.
+- Marked modified archives and package records as sanitised derivatives: original hashes, sizes and build provenance describe pre-sanitisation bytes. Added SANITISATION-REPORT.md as the publication entry point.
+
+Reason:
+- Prepare a reviewable source tree for public publication without leaking operational identities or erasing the engineering history.
+
+Validation:
+- Python regression suite: 354 passed, one established profile-fallback warning after fixture and archive-filename replacements.
+- PowerShell test syntax and the affected stale-profile rejection case checked directly. Full Pester suite not claimed; only Pester 3.4 is available for tests using newer lifecycle syntax.
+- Archive CRC, readable-text residuals, JSON structure and unchanged Git refs assessed; final counts and exceptions are recorded in SANITISATION-REPORT.md.
+
+Risks Introduced:
+- Sanitised local evidence and release archives no longer match historical checksums or original build attestations; they are explicitly labelled derivatives and must not be relabelled as verified releases.
+
+Risks Resolved:
+- Known identifying values in the reviewed readable project content replaced. Git history, embedded Git copies, binary/runtime metadata and unreadable caches remain publication boundaries, not closed by text replacement.
+
+Next Recommended Action:
+- Keep this repository private. Prefer a fresh sanitised source repository without existing Git history or local runtime/artefact folders; review the export and rebuild release packages. A same-history public release requires a separately authorised comprehensive history cleanup and credential invalidation assessment. No history rewrite, commit, push or publication is performed by this pass.

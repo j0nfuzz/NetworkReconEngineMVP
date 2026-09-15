@@ -6,13 +6,13 @@ Prepared (rewrite not executed)
 
 FILES ADDED:
 - .mailmap
-  - Maps <USERNAME> <person@example.com> to <USERNAME> <person@example.com>.
+  - Maps `<USERNAME>` <person@example.com> to `<USERNAME>` <person@example.com>.
   - Non-destructive: affects `git log`/`git shortlog` display only until a rewrite is executed.
 - docs/Phases/IMPLEMENTED-PHASE-026-GitHistoryAuthorSanitisation.md (this file)
 
 VALIDATION EVIDENCE (pre-rewrite, non-destructive):
 - `git shortlog -sne --all` with .mailmap present shows a single consolidated identity:
-  34	<USERNAME> <person@example.com>
+  34	`<USERNAME>` <person@example.com>
 - `git log --all --format=%an <%ae>` (raw, mailmap not applied) confirms exactly 2 distinct raw identities across 34 commits, matching the phase file's stated 32/2 split.
 
 TESTS ADDED:
