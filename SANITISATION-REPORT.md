@@ -321,3 +321,7 @@ If retaining the existing Git lineage is required instead, a **separately author
 ## Completion verification — 15 September 2026
 
 The scan and regression evidence above were produced on 14 September. Final verification on 15 September rechecked the edited publication files, local links, archive hashes, Python syntax, unchanged application sources and empty Git index. HEAD and branch/remote-tracking refs remain at the saved baseline. App-managed `refs/codex/` snapshot references changed since the saved scan; the historical object counts above describe the earlier scan, not exhaustive clearance of these additional snapshots. They may retain identifying data and reinforce the requirement to exclude the entire original Git database. Task-created temporary audit snapshots, mappings and scripts were removed after verification. No commit, push, publication or Git-history rewrite was performed.
+
+## Follow-up remediation — 15 September 2026
+
+The user subsequently authorised a separate sanitised full-history copy. See [PUBLICATION-REMEDIATION-REPORT.md](PUBLICATION-REMEDIATION-REPORT.md) for the disposition of every remaining-exposure item, validation and publication boundaries. The earlier sections remain the record of the initial pass and continue to describe the original private repository; their no-history-rewrite statements do not describe the separately authorised review copy.

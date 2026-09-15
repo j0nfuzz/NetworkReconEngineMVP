@@ -90,3 +90,7 @@ Historical documents, tests, Git history and local archives contain sensitive-da
 `app/` contains the collector; `tests/` contains regressions; `config/*.example` contains inventory templates. The journal and decision register in `docs/` preserve governance history. Raw field evidence and generated outputs remain local.
 
 [CONTINUATION-HANDOVER.md](CONTINUATION-HANDOVER.md) is the backlog entry point. PHASE-089 and PHASE-088 are deferred to a separate continuation repository; neither is active work here. Preserve this experiment as a restricted historical record, then archive it after its exact baseline has been recorded.
+
+## Publication builds
+
+Build public packages from a clean, committed checkout of the reviewed sanitised history. The release builder rejects dirty or unverifiable checkouts because provenance diffs can retain removed identifying data. It excludes source bytecode caches and installer launchers containing build paths. See [PUBLICATION-REMEDIATION-REPORT.md](PUBLICATION-REMEDIATION-REPORT.md) for the publication evidence and remaining boundaries.

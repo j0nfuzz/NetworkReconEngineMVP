@@ -33,8 +33,9 @@ def test_get_head_commit_sha_returns_hex_string(monkeypatch):
     assert get_head_commit_sha() == "a1b2c3d4"
 
 
-def test_get_head_commit_sha_returns_unknown_when_git_missing(monkeypatch):
+def test_get_head_commit_sha_returns_unknown_when_git_and_runtime_metadata_missing(monkeypatch):
     monkeypatch.setattr(provenance_module, "_run_git", lambda *args: "")
+    monkeypatch.setattr(provenance_module, "_load_runtime_provenance", lambda: None)
     assert get_head_commit_sha() == "unknown"
 
 
